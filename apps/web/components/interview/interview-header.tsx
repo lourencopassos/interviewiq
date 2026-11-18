@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface InterviewHeaderProps {
   companyName: string;
@@ -9,14 +10,35 @@ interface InterviewHeaderProps {
   difficulty: string;
   questionOrder: number;
   questionTotal: number;
+  /** Lights the live LED next to the title while the candidate is recording. */
+  isRecording?: boolean;
+  /** Step rail / progress, rendered in the middle of the strip. */
+  progress?: ReactNode;
+  /** Connection pill, rendered at the far right. */
+  status?: ReactNode;
 }
 
+const difficultyTone: Record<string, "sage" | "sky" | "butter" | "lavender"> = {
+  JUNIOR: "sage",
+  MID: "sky",
+  SENIOR: "butter",
+  STAFF: "lavender",
+};
+
+/**
+ * The interview page's top bar (the site nav is hidden on this route): a sticky
+ * tile strip with company · role on the left, the step rail in the middle and
+ * the elapsed timer + connection pill on the right.
+ */
 export function InterviewHeader({
   companyName,
   jobTitle,
   difficulty,
   questionOrder,
   questionTotal,
+  isRecording = false,
+  progress,
+  status,
 }: InterviewHeaderProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -31,36 +53,59 @@ export function InterviewHeader({
   const seconds = elapsed % 60;
   const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-  const difficultyColor: Record<string, string> = {
-    JUNIOR: "bg-green-500/20 text-green-400 border-green-500/30",
-    MID: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    SENIOR: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-    STAFF: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  };
-
   return (
-    <div className="flex items-center justify-between border-b border-border/50 pb-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold text-foreground">{companyName}</h1>
-        <p className="text-sm text-muted-foreground">{jobTitle}</p>
-      </div>
+    <div className="sticky top-0 z-30 -mx-2 bg-paper/90 px-2 pb-2 pt-2 backdrop-blur-md">
+      <header className="tile flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-5">
+        {/* Left: company · role */}
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              "led shrink-0",
+              isRecording
+                ? "led-live bg-rust text-rust/40"
+                : "bg-sage-deep text-sage-deep/40",
+            )}
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="truncate text-[15px] leading-tight">{companyName}</h1>
+              <Badge
+                variant={difficultyTone[difficulty] ?? "outline"}
+                className="hidden sm:inline-flex"
+              >
+                {difficulty}
+              </Badge>
+            </div>
+            {jobTitle && (
+              <p className="truncate text-[12px] leading-snug text-muted-foreground">
+                {jobTitle}
+              </p>
+            )}
+          </div>
+        </div>
 
-      <div className="flex items-center gap-4">
-        <Badge
-          variant="outline"
-          className={difficultyColor[difficulty] || ""}
-        >
-          {difficulty}
-        </Badge>
+        {/* Middle: step rail (drops to its own row on small screens) */}
+        {progress && (
+          <div className="order-last w-full basis-full md:order-none md:w-auto md:flex-1 md:basis-auto md:px-2">
+            {progress}
+          </div>
+        )}
 
-        <span className="text-sm font-mono text-muted-foreground">
-          {timeStr}
-        </span>
-
-        <span className="text-sm text-muted-foreground">
-          {questionOrder}/{questionTotal}
-        </span>
-      </div>
+        {/* Right: counter, timer, connection */}
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <span className="text-[11px] font-semibold tabular-nums text-muted-foreground">
+            {questionOrder}/{questionTotal}
+          </span>
+          <time
+            className="rounded-md border border-line-strong bg-sheet px-2 py-0.5 text-[12px] font-semibold tabular-nums text-ink-2"
+            aria-label="Elapsed time"
+          >
+            {timeStr}
+          </time>
+          {status}
+        </div>
+      </header>
     </div>
   );
 }

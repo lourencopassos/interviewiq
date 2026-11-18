@@ -1,6 +1,8 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface ConnectionStatusProps {
   status: "connecting" | "connected" | "reconnecting" | "error";
@@ -9,34 +11,33 @@ interface ConnectionStatusProps {
 }
 
 const statusConfig = {
-  connecting: { color: "bg-yellow-500", label: "Connecting..." },
-  connected: { color: "bg-green-500", label: "Connected" },
-  reconnecting: { color: "bg-yellow-500", label: "Reconnecting..." },
-  error: { color: "bg-red-500", label: "Disconnected" },
+  connecting: { led: "led-live bg-butter-deep text-butter-deep/40", label: "Connecting…" },
+  connected: { led: "bg-sage-deep text-sage-deep/40", label: "Connected" },
+  reconnecting: { led: "led-live bg-butter-deep text-butter-deep/40", label: "Reconnecting…" },
+  error: { led: "bg-blush-deep text-blush-deep/40", label: "Disconnected" },
 };
 
+/** SSE connection pill: sage LED when connected, butter while (re)connecting, blush on error. */
 export function ConnectionStatus({ status, onReconnect }: ConnectionStatusProps) {
   const config = statusConfig[status];
 
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span
-        className={`h-2 w-2 rounded-full ${config.color} ${
-          status === "connecting" || status === "reconnecting"
-            ? "animate-pulse"
-            : ""
-        }`}
-      />
-      <span>{config.label}</span>
+    <div className="flex items-center gap-2">
+      <span className="pill bg-card text-ink-2" role="status">
+        <span className={cn("led", config.led)} aria-hidden />
+        {config.label}
+      </span>
       {status === "error" && onReconnect && (
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="outline"
           onClick={onReconnect}
-          className="ml-1 inline-flex items-center gap-1 rounded-md border border-input px-2 py-0.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="h-7 gap-1 px-2 text-[11px]"
         >
           <RefreshCw className="h-3 w-3" />
           Reconnect
-        </button>
+        </Button>
       )}
     </div>
   );

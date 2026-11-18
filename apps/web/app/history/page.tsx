@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { getClientId } from "@/lib/client-id";
 import { SessionCard } from "@/components/history/session-card";
 import { SessionFilters } from "@/components/history/session-filters";
@@ -95,35 +95,42 @@ export default function HistoryPage() {
   const hasActiveFilters = difficulty !== "all" || interviewType !== "all";
 
   return (
-    <div className="container py-8 max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Interview History</h1>
+    <div className="container max-w-4xl space-y-6 py-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow flex items-center gap-2">
+            <span>
+              <span className="text-ink">[ history ]</span> every session on this machine
+            </span>
+            {!loading && (
+              <span className="pill bg-card tabular-nums normal-case tracking-normal">
+                {hasActiveFilters ? `${filtered.length} of ${sessions.length}` : sessions.length}
+              </span>
+            )}
+          </p>
+          <h1 className="mt-2 text-2xl sm:text-3xl">Past sessions</h1>
         </div>
-        <Link href="/new">
-          <Button className="gap-2">
+        <Button asChild variant="accent" className="shrink-0">
+          <Link href="/new">
             <Plus className="h-4 w-4" />
-            New Interview
-          </Button>
-        </Link>
-      </div>
+            New interview
+          </Link>
+        </Button>
+      </header>
 
       <SessionFilters
         difficulty={difficulty}
         interviewType={interviewType}
         onDifficultyChange={setDifficulty}
         onInterviewTypeChange={setInterviewType}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
       />
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
+        <div className="grid gap-4 sm:grid-cols-2" aria-busy="true">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 rounded-tile" />
           ))}
         </div>
       ) : sessions.length === 0 ? (
@@ -131,13 +138,15 @@ export default function HistoryPage() {
       ) : filtered.length === 0 && hasActiveFilters ? (
         <EmptyState filtered onClearFilters={clearFilters} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((session) => (
-            <SessionCard
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((session, i) => (
+            <div
               key={session.id}
-              session={session}
-              onDelete={handleDelete}
-            />
+              className="animate-fade-up"
+              style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
+            >
+              <SessionCard session={session} onDelete={handleDelete} />
+            </div>
           ))}
         </div>
       )}

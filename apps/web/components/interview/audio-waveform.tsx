@@ -1,37 +1,55 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+
 interface AudioWaveformProps {
   isActive: boolean;
   audioLevel: number;
   variant: "speaking" | "recording";
 }
 
+const BAR_COUNT = 28;
+
+/**
+ * Bars in the candidate's sky while recording, the interviewer's peach while
+ * the question plays; staggered wave animation when active, flat line when idle.
+ * The mic level nudges the bar heights so the wave reacts to the voice.
+ */
 export function AudioWaveform({ isActive, audioLevel, variant }: AudioWaveformProps) {
-  const barCount = 24;
-  const baseColor = variant === "speaking" ? "bg-blue-500" : "bg-red-500";
+  const barColor = variant === "recording" ? "bg-sky-deep" : "bg-peach-deep";
+  const label = variant === "recording" ? "listening" : "interviewer";
+  const level = Math.min(1, Math.max(0, audioLevel));
 
   return (
-    <div className="flex items-center justify-center gap-[3px] h-16">
-      {Array.from({ length: barCount }).map((_, i) => {
-        // Create a wave pattern based on position
-        const position = Math.abs(i - barCount / 2) / (barCount / 2);
-        const baseHeight = isActive ? 0.2 + (1 - position) * 0.3 : 0.1;
-        const dynamicHeight = isActive ? audioLevel * (1 - position * 0.5) : 0;
-        const height = Math.min(1, baseHeight + dynamicHeight);
+    <div
+      className="flex h-16 items-center justify-center gap-[3px]"
+      role="img"
+      aria-label={isActive ? `Audio active: ${label}` : "Audio idle"}
+    >
+      {Array.from({ length: BAR_COUNT }).map((_, i) => {
+        // 0 at the centre, ~1 at the edges — the wave is tallest in the middle
+        const position = Math.abs(i - (BAR_COUNT - 1) / 2) / (BAR_COUNT / 2);
+        const base = 10 + ((i * 7) % 18);
+        const height = isActive
+          ? Math.round(base * (1 - position * 0.35) + level * 22 * (1 - position * 0.5))
+          : 4;
 
         return (
-          <div
+          <span
             key={i}
-            className={`w-1 rounded-full transition-all duration-75 ${
-              isActive ? baseColor : "bg-muted-foreground/30"
-            }`}
+            className={cn(
+              "block w-[3px] origin-center rounded-full transition-[height] duration-100",
+              isActive ? cn(barColor, "animate-wave-bar") : "bg-line-strong",
+            )}
             style={{
-              height: `${Math.max(4, height * 64)}px`,
-              opacity: isActive ? 0.6 + height * 0.4 : 0.3,
+              height: `${height}px`,
+              animationDelay: isActive ? `${(i % 7) * 90}ms` : undefined,
+              animationDuration: isActive ? `${700 + (i % 5) * 110}ms` : undefined,
             }}
           />
         );
       })}
+      {isActive && <span className="eyebrow ml-3">{label}</span>}
     </div>
   );
 }

@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { MicOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic } from "lucide-react";
 
 export default function InterviewError({
   error,
@@ -19,23 +19,25 @@ export default function InterviewError({
 
   return (
     <div className="container max-w-lg py-24">
-      <Card className="border-destructive/30">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-            <Mic className="h-6 w-6 text-destructive" />
+      <Card tone="paper" pop className="animate-pop-in">
+        <CardHeader className="items-center text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-md border-1.5 border-ink bg-blush text-blush-deep shadow-pop-sm">
+            <MicOff className="h-6 w-6" />
           </div>
-          <CardTitle>Interview Session Error</CardTitle>
+          <p className="eyebrow">Interview session</p>
+          <CardTitle>Something went wrong</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <p className="text-sm text-muted-foreground">
+        <CardContent className="space-y-5 text-center">
+          <p className="text-[13px] leading-relaxed text-muted-foreground">
             Something went wrong during the interview. Your progress has been saved.
           </p>
-          <div className="flex justify-center gap-3">
-            <Button onClick={reset} variant="default">
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button onClick={reset} variant="accent">
+              <RefreshCw className="h-4 w-4" />
               Reconnect
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/new">Start New Interview</Link>
+              <Link href="/new">Start new interview</Link>
             </Button>
           </div>
         </CardContent>

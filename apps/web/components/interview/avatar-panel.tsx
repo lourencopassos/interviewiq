@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 type AvatarPhase =
   | "speaking"
@@ -18,6 +19,14 @@ interface AvatarPanelProps {
   phase: AvatarPhase;
   isMockMode: boolean;
 }
+
+const phaseLabels: Record<AvatarPhase, string> = {
+  speaking: "Speaking…",
+  listening: "Listening",
+  thinking: "Processing…",
+  loading: "Connecting avatar…",
+  fallback: "Audio mode",
+};
 
 export function AvatarPanel({
   remoteStream,
@@ -40,9 +49,10 @@ export function AvatarPanel({
   }, [remoteStream]);
 
   const showLiveAvatar = isStreamConnected && remoteStream && !isMockMode;
+  const isSpeaking = phase === "speaking" || isPlaying;
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 border border-zinc-800">
+    <div className="tile relative aspect-video w-full overflow-hidden bg-sheet">
       {/* Live D-ID WebRTC avatar */}
       {showLiveAvatar && (
         <video
@@ -58,41 +68,32 @@ export function AvatarPanel({
       {!showLiveAvatar && (
         <div className="flex h-full w-full items-center justify-center">
           <div
-            className={`
-              relative h-32 w-32 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700
-              flex items-center justify-center text-4xl
-              ${phase === "speaking" || isPlaying ? "animate-avatar-speaking" : ""}
-              ${phase === "listening" ? "animate-avatar-idle" : ""}
-              ${phase === "thinking" ? "animate-pulse" : ""}
-            `}
+            className={cn(
+              "flex h-32 w-32 items-center justify-center rounded-full border-1.5 border-ink bg-peach text-peach-deep shadow-pop",
+              isSpeaking && "animate-avatar-speaking",
+              phase === "listening" && !isSpeaking && "animate-avatar-idle",
+              phase === "thinking" && "animate-pulse",
+            )}
           >
-            <svg
-              className="h-16 w-16 text-white"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="h-16 w-16" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
           </div>
 
-          {/* Status indicator */}
-          <div className="absolute bottom-4 left-4">
-            <span className="text-xs text-zinc-400">
-              {phase === "speaking" && "Speaking..."}
-              {phase === "listening" && "Listening"}
-              {phase === "thinking" && "Processing..."}
-              {phase === "loading" && "Connecting avatar..."}
-              {phase === "fallback" && "Audio mode"}
-            </span>
+          {/* Status indicator (top-left so it never sits under the self-view) */}
+          <div className="absolute left-3 top-3">
+            <span className="pill bg-card text-ink-2">{phaseLabels[phase]}</span>
           </div>
         </div>
       )}
 
-      {/* Speaking indicator dot */}
-      {(phase === "speaking" || isPlaying) && (
-        <div className="absolute bottom-4 right-4 flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs text-zinc-400">AI Interviewer</span>
+      {/* Speaking indicator */}
+      {isSpeaking && (
+        <div className="absolute bottom-3 right-3">
+          <span className="pill bg-peach text-peach-deep">
+            <span className="led led-live bg-peach-deep text-peach-deep/40" aria-hidden />
+            AI Interviewer
+          </span>
         </div>
       )}
     </div>

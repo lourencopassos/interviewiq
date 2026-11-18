@@ -11,6 +11,7 @@ interface InterviewState {
     category: string;
     order: number;
     total: number;
+    isFollowUp?: boolean;
   } | null;
   audioUrl: string | null;
   transcript: string | null;

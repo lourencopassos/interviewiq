@@ -10,29 +10,28 @@ interface ReportActionsProps {
 
 export function ReportActions({ sessionId }: ReportActionsProps) {
   return (
-    <div className="flex flex-wrap gap-3 print:hidden">
-      <Link href="/new">
-        <Button variant="default" className="gap-2">
+    <div
+      data-session-id={sessionId}
+      className="flex flex-wrap items-center gap-3 border-t border-line pt-6 print:hidden"
+    >
+      <Button asChild variant="accent">
+        <Link href="/new">
           <RotateCcw className="h-4 w-4" />
-          Practice Again
-        </Button>
-      </Link>
+          Practice again
+        </Link>
+      </Button>
 
-      <Button
-        variant="outline"
-        className="gap-2"
-        onClick={() => window.print()}
-      >
+      <Button variant="outline" onClick={() => window.print()}>
         <Printer className="h-4 w-4" />
         Export PDF
       </Button>
 
-      <Link href="/history">
-        <Button variant="outline" className="gap-2">
+      <Button asChild variant="ghost">
+        <Link href="/history">
           <History className="h-4 w-4" />
-          View History
-        </Button>
-      </Link>
+          History
+        </Link>
+      </Button>
     </div>
   );
 }

@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { X, Globe } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { useSetupStore } from "@/lib/stores/setup-store";
 
 export function JobPreviewCard() {
@@ -16,118 +9,115 @@ export function JobPreviewCard() {
 
   if (step !== "ready" || !parsedJob) return null;
 
+  const hasIntel =
+    companyIntel &&
+    (companyIntel.techStack.length > 0 ||
+      companyIntel.engineeringCulture ||
+      companyIntel.coachingTip);
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle>{parsedJob.jobTitle}</CardTitle>
-            <CardDescription className="mt-1">
-              {parsedJob.companyName}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="capitalize">
-              {parsedJob.seniority}
-            </Badge>
-            <button
-              onClick={clearAnalysis}
-              className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
-              title="Clear analysis and re-parse"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
+    <Card className="animate-pop-in overflow-hidden">
+      {/* Title strip */}
+      <div className="flex items-center justify-between gap-3 border-b-1.5 border-ink bg-sheet px-4 py-2.5">
+        <span className="inline-flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-2">
+          <span className="led bg-sage-deep text-sage-deep/40" aria-hidden />
+          <span className="truncate">parsed · {parsedJob.companyName}</span>
+        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="pill bg-butter capitalize text-butter-deep">
+            {parsedJob.seniority}
+          </span>
+          <button
+            type="button"
+            onClick={clearAnalysis}
+            title="Clear analysis and re-parse"
+            aria-label="Clear analysis and re-parse"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-[5px] border-1.5 border-transparent text-muted-foreground transition-colors hover:border-ink hover:bg-blush hover:text-blush-deep"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+
+      <div className="space-y-5 p-5">
+        <div>
+          <h3 className="text-xl leading-tight">{parsedJob.jobTitle}</h3>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            {parsedJob.companyName} · <span className="capitalize">{parsedJob.domain}</span>
+          </p>
+        </div>
+
         {/* Skills */}
         <div>
-          <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-            Key Skills
-          </h4>
+          <p className="eyebrow mb-2">What they&apos;re hiring for</p>
           <div className="flex flex-wrap gap-1.5">
             {parsedJob.primarySkills.map((skill) => (
-              <Badge key={skill} variant="default">
+              <span key={skill} className="pill bg-sky text-sky-deep">
                 {skill}
-              </Badge>
+              </span>
             ))}
             {parsedJob.secondarySkills.map((skill) => (
-              <Badge key={skill} variant="outline">
+              <span key={skill} className="pill border-line-strong bg-card text-ink-2">
                 {skill}
-              </Badge>
+              </span>
             ))}
           </div>
         </div>
 
-        {/* Domain & Focus */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h4 className="mb-1 text-sm font-medium text-muted-foreground">
-              Domain
-            </h4>
-            <p className="text-sm capitalize">{parsedJob.domain}</p>
-          </div>
-          <div>
-            <h4 className="mb-1 text-sm font-medium text-muted-foreground">
-              Interview Focus
-            </h4>
-            <ul className="space-y-0.5 text-sm">
-              {parsedJob.interviewFocus.slice(0, 3).map((topic) => (
-                <li key={topic}>{topic}</li>
-              ))}
-            </ul>
-          </div>
+        {/* Focus */}
+        <div>
+          <p className="eyebrow mb-2">Where the questions will go</p>
+          <ul className="space-y-1 text-[13px] text-ink-2">
+            {parsedJob.interviewFocus.slice(0, 3).map((topic, i) => (
+              <li key={topic} className="flex gap-2">
+                <span className="w-5 shrink-0 tabular-nums text-muted-foreground">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span>{topic}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Company Intelligence */}
-        {companyIntel && (companyIntel.techStack.length > 0 || companyIntel.engineeringCulture || companyIntel.coachingTip) && (
-          <>
-            <Separator />
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium">Company Intelligence</h4>
+        {/* Company intelligence */}
+        {hasIntel && (
+          <div className="sheet space-y-4 p-4">
+            <p className="eyebrow inline-flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5" aria-hidden />
+              Company intel · web search
+            </p>
 
-              {companyIntel.techStack.length > 0 && (
-                <div>
-                  <span className="text-xs text-muted-foreground">
-                    Tech Stack
-                  </span>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {companyIntel.techStack.map((tech) => (
-                      <Badge key={tech} variant="outline" className="text-xs">
-                        {tech}
-                      </Badge>
-                    ))}
-                  </div>
+            {companyIntel.techStack.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[11px] text-muted-foreground">Tech stack</p>
+                <div className="flex flex-wrap gap-1">
+                  {companyIntel.techStack.map((tech) => (
+                    <span key={tech} className="pill bg-lavender text-lavender-deep">
+                      {tech}
+                    </span>
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {companyIntel.engineeringCulture && (
-                <div>
-                  <span className="text-xs text-muted-foreground">
-                    Engineering Culture
-                  </span>
-                  <p className="mt-0.5 text-sm">
-                    {companyIntel.engineeringCulture}
-                  </p>
-                </div>
-              )}
+            {companyIntel.engineeringCulture && (
+              <div>
+                <p className="mb-1 text-[11px] text-muted-foreground">Engineering culture</p>
+                <p className="text-[13px] leading-relaxed text-ink-2">
+                  {companyIntel.engineeringCulture}
+                </p>
+              </div>
+            )}
 
-              {companyIntel.coachingTip && (
-                <div className="rounded-md bg-secondary/50 p-3">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Coaching Tip
-                  </span>
-                  <p className="mt-0.5 text-sm">{companyIntel.coachingTip}</p>
-                </div>
-              )}
-            </div>
-          </>
+            {companyIntel.coachingTip && (
+              <div className="rounded-md border-1.5 border-ink bg-butter p-3 text-butter-deep shadow-pop-sm">
+                <p className="eyebrow mb-1 text-butter-deep/80">Coaching tip</p>
+                <p className="text-[13px] leading-relaxed">{companyIntel.coachingTip}</p>
+              </div>
+            )}
+          </div>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

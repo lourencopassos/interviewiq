@@ -19,6 +19,7 @@ interface VideoLayoutProps {
   children: ReactNode;
 }
 
+/** Meet-like split: avatar tile with the self-view pinned in it, controls beside. */
 export function VideoLayout({
   remoteStream,
   isStreamConnected,
@@ -31,8 +32,8 @@ export function VideoLayout({
   children,
 }: VideoLayoutProps) {
   return (
-    <div className="container max-w-6xl py-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+    <div className="container max-w-6xl py-6 sm:py-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:items-start">
         {/* Left: Avatar panel (3/5 width on desktop) */}
         <div className="lg:col-span-3">
           <div className="relative">
@@ -53,7 +54,7 @@ export function VideoLayout({
 
         {/* Right: Controls and question panel (2/5 width on desktop) */}
         <div className="lg:col-span-2">
-          <div className="space-y-6">{children}</div>
+          <div className="space-y-5">{children}</div>
         </div>
       </div>
     </div>

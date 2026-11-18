@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { getMockMode, toggleMockMode } from "@/lib/mock-mode";
 
+/** Dev-only switch for the canned-fixture interview loop. Lives bottom-left. */
 export function MockToggle() {
   const [enabled, setEnabled] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -12,30 +13,20 @@ export function MockToggle() {
     setMounted(true);
   }, []);
 
-  // Only render in development
   if (process.env.NODE_ENV !== "development") return null;
   if (!mounted) return null;
 
   return (
     <button
-      onClick={() => {
-        const next = toggleMockMode();
-        setEnabled(next);
-      }}
-      className={`fixed bottom-4 left-4 z-50 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg transition-colors ${
-        enabled
-          ? "bg-amber-500/90 text-black hover:bg-amber-400"
-          : "bg-zinc-700/90 text-zinc-300 hover:bg-zinc-600"
+      type="button"
+      onClick={() => setEnabled(toggleMockMode())}
+      className={`tile-pop tile-pop-hover tile-pop-press fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] shadow-pop-sm print:hidden ${
+        enabled ? "bg-butter text-butter-deep" : "bg-card text-ink-2"
       }`}
-      title={enabled ? "Mock mode ON — click to use real APIs" : "Live mode — click to enable mock mode"}
+      title={enabled ? "Mock mode on: no paid API calls" : "Mock mode off: real API calls"}
     >
-      <span className="text-sm">🧪</span>
-      <span>{enabled ? "MOCK" : "LIVE"}</span>
-      <span
-        className={`ml-1 inline-block h-2 w-2 rounded-full ${
-          enabled ? "bg-black/40" : "bg-green-400"
-        }`}
-      />
+      <span className={`led ${enabled ? "led-live bg-rust text-rust/40" : "bg-line-strong text-line-strong/40"}`} aria-hidden />
+      Mock {enabled ? "on" : "off"}
     </button>
   );
 }
