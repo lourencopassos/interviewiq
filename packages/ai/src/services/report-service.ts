@@ -1,5 +1,5 @@
 import { prisma } from "@interviewiq/db";
-import { coachingReportSchema, type CoachingReport } from "@interviewiq/types";
+import { coachingReportSchema, type CoachingReport, type CoachNoteView } from "@interviewiq/types";
 import { isString, parseJsonArray, parseJsonObject } from "../utils/json";
 
 export interface ReportQuestionView {
@@ -12,6 +12,8 @@ export interface ReportQuestionView {
   feedback: string | null;
   strengths: string[];
   gaps: string[];
+  coachNotes: CoachNoteView[];
+  coachedBeforeAnswer: boolean;
 }
 
 export interface ReportSessionView {
@@ -22,6 +24,7 @@ export interface ReportSessionView {
   interviewType: string;
   language: string;
   status: string;
+  coachEnabled: boolean;
 }
 
 export type ReportPayload =
@@ -87,7 +90,9 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
       interviewType: true,
       language: true,
       status: true,
+      coachEnabled: true,
       report: true,
+      coachNotes: { orderBy: { createdAt: "asc" } },
       questions: {
         orderBy: { order: "asc" },
         select: {
@@ -110,20 +115,42 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
   const parsed = coachingReportSchema.safeParse(parseJsonObject(session.report.summary));
   const report = parsed.success ? parsed.data : reportFromColumns(session.report);
 
+  const notesByQuestion = new Map<string, CoachNoteView[]>();
+  for (const n of session.coachNotes) {
+    if (!n.questionId) continue;
+    const view: CoachNoteView = {
+      id: n.id,
+      questionId: n.questionId,
+      source: n.source as CoachNoteView["source"],
+      selection: n.selection,
+      prompt: n.prompt,
+      answer: n.answer,
+      askedBeforeAnswer: n.askedBeforeAnswer,
+      model: n.model,
+      createdAt: n.createdAt.toISOString(),
+    };
+    notesByQuestion.set(n.questionId, [...(notesByQuestion.get(n.questionId) ?? []), view]);
+  }
+
   const questions: ReportQuestionView[] = session.questions
     .filter((q) => q.transcript !== null)
-    .map((q, i) => ({
-      id: q.id,
-      // Dense display order over answered questions (skipped ones are excluded)
-      order: i,
-      text: q.text,
-      category: q.category,
-      transcript: q.transcript,
-      score: q.score,
-      feedback: q.feedback,
-      strengths: parseJsonArray(q.strengths, isString),
-      gaps: parseJsonArray(q.gaps, isString),
-    }));
+    .map((q, i) => {
+      const notes = notesByQuestion.get(q.id) ?? [];
+      return {
+        id: q.id,
+        // Dense display order over answered questions (skipped ones are excluded)
+        order: i,
+        text: q.text,
+        category: q.category,
+        transcript: q.transcript,
+        score: q.score,
+        feedback: q.feedback,
+        strengths: parseJsonArray(q.strengths, isString),
+        gaps: parseJsonArray(q.gaps, isString),
+        coachNotes: notes,
+        coachedBeforeAnswer: notes.some((n) => n.askedBeforeAnswer),
+      };
+    });
 
   return {
     kind: "ready",
@@ -136,6 +163,7 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
       interviewType: session.interviewType,
       language: session.language,
       status: session.status,
+      coachEnabled: session.coachEnabled,
     },
     questions,
   };

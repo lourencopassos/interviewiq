@@ -2,8 +2,10 @@ export {
   callClaude,
   callClaudeWithSearch,
   callClaudePlainText,
+  streamClaudeText,
   AIResponseParseError,
   CLAUDE_MODEL,
+  COACH_MODEL,
 } from "./client";
 export { runWithMockMode, isMockMode } from "./mock";
 export { parseJobDescription } from "./prompts/job-parser";
@@ -19,6 +21,7 @@ export {
   destroyOrchestrator,
 } from "./services/interview-orchestrator";
 export { getReportPayload, verdictForScore } from "./services/report-service";
+export { streamCoachAnswer, listCoachNotes } from "./services/coach-service";
 export type { ReportPayload, ReportQuestionView, ReportSessionView } from "./services/report-service";
 export {
   researchCompanyCached,
