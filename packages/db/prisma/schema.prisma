@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id             String        @id @default(cuid())
+  createdAt      DateTime      @default(now())
+  clientId       String
+  jobTitle       String
+  companyName    String
+  jobDescription String        @db.Text
+  difficulty     Difficulty     @default(MID)
+  interviewType  InterviewType  @default(TECHNICAL)
+  language       Language       @default(EN)
+  status         SessionStatus  @default(SETUP)
+  currentIndex   Int            @default(0)
+  parsedJob      String?        @db.Text
+  companyIntel   String?        @db.Text
+  resumeText     String?        @db.Text
+  opening        String?        @db.Text
+  closing        String?        @db.Text
+  videoMode      Boolean        @default(false)
+  avatarImageUrl String?
+  questions      Question[]
+  report         Report?
+
+  @@index([clientId])
+}
+
+model Question {
+  id         String  @id @default(cuid())
+  sessionId  String
+  session    Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  order      Int
+  text       String  @db.Text
+  category   String
+  stage      String?
+  metadata   String? @db.Text
+  transcript String? @db.Text
+  audioPath  String?
+  score      Int?
+  feedback   String? @db.Text
+  strengths  String? @db.Text
+  gaps       String? @db.Text
+
+  @@index([sessionId])
+}
+
+model Report {
+  id                 String  @id @default(cuid())
+  sessionId          String  @unique
+  session            Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  overallScore       Int
+  technicalScore     Int
+  behavioralScore    Int
+  communicationScore Int
+  strengths          String  @db.Text
+  weaknesses         String  @db.Text
+  studyPlan          String  @db.Text
+  summary            String  @db.Text
+}
+
+enum Difficulty {
+  JUNIOR
+  MID
+  SENIOR
+  STAFF
+}
+
+enum InterviewType {
+  PHONE_SCREEN
+  TECHNICAL
+  BEHAVIORAL
+  SYSTEM_DESIGN
+  FULL_LOOP
+}
+
+enum Language {
+  EN
+  PT_BR
+}
+
+model CompanyResearch {
+  id          String   @id @default(cuid())
+  companyName String   @unique
+  data        String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum SessionStatus {
+  SETUP
+  RESEARCHING
+  BRIEFING
+  INTERVIEWING
+  WRAPPING_UP
+  COMPLETED
+  ABANDONED
+}
