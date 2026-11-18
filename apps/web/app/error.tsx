@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
 
 export default function GlobalError({
@@ -18,32 +17,25 @@ export default function GlobalError({
 
   return (
     <div className="container max-w-lg py-24">
-      <Card className="border-destructive/30">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
-          </div>
-          <CardTitle>Something went wrong</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            An unexpected error occurred. Please try again.
-          </p>
-          {error.digest && (
-            <p className="text-xs text-muted-foreground font-mono">
-              Error ID: {error.digest}
-            </p>
-          )}
-          <div className="flex justify-center gap-3">
-            <Button onClick={reset} variant="default">
-              Try Again
-            </Button>
-            <Button onClick={() => (window.location.href = "/")} variant="outline">
-              Go Home
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="tile-pop bg-blush p-6 text-blush-deep sm:p-8">
+        <div className="flex items-center justify-between gap-3">
+          <p className="eyebrow text-current opacity-80">[ error ] something broke</p>
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+        </div>
+        <h1 className="mt-2 text-2xl text-current">That didn&apos;t go as planned.</h1>
+        <p className="mt-2 text-[13px] leading-relaxed opacity-90">
+          An unexpected error stopped this page. Trying again usually fixes it.
+        </p>
+        {error.digest && (
+          <p className="mt-3 text-[11px] tabular-nums opacity-70">ref {error.digest}</p>
+        )}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button onClick={reset}>Try again</Button>
+          <Button onClick={() => (window.location.href = "/")} variant="outline">
+            Go home
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

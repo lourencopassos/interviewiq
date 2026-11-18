@@ -73,33 +73,55 @@ export function StartInterviewButton() {
     }
   };
 
+  // A one-line readback of what's about to run, in the eyebrow voice.
+  const summary = [
+    difficulty,
+    interviewType.replace(/_/g, " "),
+    language.replace(/_/g, "-"),
+    videoMode ? "video" : "audio",
+    resumeText ? "with resume" : null,
+  ].filter(Boolean);
+
   return (
     <div className="space-y-3">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Could not start interview</AlertTitle>
+          <AlertTitle>Could not start the interview</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <Button
-        size="lg"
-        onClick={handleStart}
-        disabled={isCreating}
-        className="w-full"
-      >
-        {isCreating ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating session...
-          </>
-        ) : (
-          <>
-            {error ? "Try again" : "Start Interview"}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </>
-        )}
-      </Button>
+
+      <div className="tile-pop bg-ink p-4 text-paper sm:p-5">
+        <p className="eyebrow text-paper/60">
+          ready · {summary.join(" · ")}
+        </p>
+        <h3 className="mt-1.5 text-lg text-paper">
+          {parsedJob.jobTitle} at {parsedJob.companyName}
+        </h3>
+        <Button
+          variant="accent"
+          size="xl"
+          onClick={handleStart}
+          disabled={isCreating}
+          className="mt-4 w-full"
+        >
+          {isCreating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Creating the session…
+            </>
+          ) : (
+            <>
+              {error ? "Try again" : "Start the interview"}
+              <ArrowRight className="h-4 w-4" />
+            </>
+          )}
+        </Button>
+        <p className="mt-3 text-center text-[11px] text-paper/60">
+          You&apos;ll be asked for microphone{videoMode ? " and camera" : ""} access on the next screen.
+        </p>
+      </div>
     </div>
   );
 }

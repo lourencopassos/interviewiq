@@ -1,6 +1,8 @@
 "use client";
 
+import { Video } from "lucide-react";
 import { useSetupStore } from "@/lib/stores/setup-store";
+import { cn } from "@/lib/utils";
 
 interface VideoModeToggleProps {
   disabled?: boolean;
@@ -11,38 +13,51 @@ export function VideoModeToggle({ disabled }: VideoModeToggleProps) {
   const setVideoMode = useSetupStore((s) => s.setVideoMode);
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
-      <div className="space-y-0.5">
+    <div className="sheet flex items-center gap-3 px-4 py-3">
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border-1.5 border-ink shadow-pop-sm transition-colors duration-150",
+          videoMode ? "bg-peach text-peach-deep" : "bg-card text-ink-2",
+        )}
+        aria-hidden
+      >
+        <Video className="h-4 w-4" />
+      </span>
+
+      <div className="min-w-0 flex-1 space-y-0.5">
         <label
           htmlFor="video-mode"
-          className="text-sm font-medium text-foreground cursor-pointer"
+          className="block cursor-pointer text-[13px] font-semibold text-ink"
         >
-          Video Interview
+          Video interview
         </label>
-        <p className="text-xs text-muted-foreground">
-          Google Meet-like experience with an AI interviewer avatar
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          A Meet-style call with an interviewer avatar and your webcam. Off means audio only.
         </p>
       </div>
+
       <button
         id="video-mode"
         role="switch"
         aria-checked={videoMode}
         disabled={disabled}
         onClick={() => setVideoMode(!videoMode)}
-        className={`
-          relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent
-          transition-colors duration-200 ease-in-out
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
-          disabled:cursor-not-allowed disabled:opacity-50
-          ${videoMode ? "bg-blue-600" : "bg-zinc-700"}
-        `}
+        className={cn(
+          "relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full border-1.5 border-ink p-0.5",
+          "transition-colors duration-150 ease-pop",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-sheet",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          videoMode ? "bg-sage" : "bg-paper-2",
+        )}
       >
+        <span className="sr-only">{videoMode ? "Video on" : "Video off"}</span>
         <span
-          className={`
-            pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0
-            transition-transform duration-200 ease-in-out
-            ${videoMode ? "translate-x-5" : "translate-x-0"}
-          `}
+          className={cn(
+            "pointer-events-none inline-block h-5 w-5 rounded-full border-1.5 border-ink shadow-pop-sm",
+            "transition-transform duration-150 ease-pop",
+            videoMode ? "translate-x-5 bg-sage-deep" : "translate-x-0 bg-card",
+          )}
+          aria-hidden
         />
       </button>
     </div>

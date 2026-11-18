@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, MicOff, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Layers, MicOff, RefreshCw } from "lucide-react";
 import { useInterviewStream } from "@/hooks/useInterviewStream";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
@@ -337,6 +337,52 @@ export default function InterviewPage() {
     }
   }, [webcam]);
 
+  // Keyboard shortcuts: Space toggles recording, R replays the question.
+  // Ignored while typing in a field and while an answer is being processed.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (event.code === "Space") {
+        if (phase === "ready_to_record") {
+          event.preventDefault();
+          void handleStartRecording();
+        } else if (phase === "recording") {
+          event.preventDefault();
+          void handleStopRecording();
+        }
+        return;
+      }
+
+      if (event.key === "r" || event.key === "R") {
+        if (!interview.audioUrl) return;
+        if (phase !== "ready_to_record" && phase !== "speaking") return;
+        event.preventDefault();
+        playback
+          .enqueue(interview.audioUrl, {
+            mockText: interview.currentQuestion?.text,
+            onStart: () => setPhase("speaking"),
+          })
+          .then(() => setPhase("ready_to_record"))
+          .catch(() => setPhase("ready_to_record"));
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, interview.audioUrl, interview.currentQuestion?.text, handleStartRecording, handleStopRecording]);
+
   // Derive avatar phase from interview phase
   const avatarPhase = (() => {
     if (avatarStream.error || interview.avatarFailed) return "fallback" as const;
@@ -348,6 +394,14 @@ export default function InterviewPage() {
   })();
 
   const micDenied = recorder.permissionState === "denied";
+
+  // `isFollowUp` rides along on the `question_ready` payload (see
+  // packages/types/src/events.ts); the stream hook stores the payload as-is.
+  const currentQuestion = interview.currentQuestion;
+  const isFollowUp =
+    currentQuestion !== null &&
+    "isFollowUp" in currentQuestion &&
+    currentQuestion.isFollowUp === true;
 
   // Inline error alerts (rendered in both the loading view and the main layout)
   const errorAlerts = (
@@ -434,7 +488,7 @@ export default function InterviewPage() {
       )}
 
       {micDenied && (
-        <Alert variant="destructive">
+        <Alert variant="warning">
           <MicOff className="h-4 w-4" />
           <AlertTitle>Microphone access is blocked</AlertTitle>
           <AlertDescription className="space-y-3">
@@ -469,25 +523,44 @@ export default function InterviewPage() {
   // Loading state
   if (phase === "loading" && !interview.currentQuestion) {
     return (
-      <div className="container max-w-3xl py-12">
-        <div className="space-y-6">
+      <div className="container max-w-3xl py-8 sm:py-12">
+        <div className="space-y-5">
           {errorAlerts}
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-48" />
-          <div className="h-px bg-border/50" />
-          <Skeleton className="h-32 w-full" />
+          {/* Header strip placeholder */}
+          <div className="tile flex items-center gap-4 px-5 py-4">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <Skeleton className="h-6 w-14" />
+          </div>
+          {/* Question placeholder */}
+          <div className="tile p-5 sm:p-6">
+            <div className="flex gap-4">
+              <Skeleton className="h-10 w-10 rounded-md" />
+              <div className="flex-1 space-y-2.5">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-5 w-full" />
+                <Skeleton className="h-5 w-5/6" />
+              </div>
+            </div>
+          </div>
           <div className="flex justify-center">
-            <Skeleton className="h-16 w-16 rounded-full" />
+            <Skeleton className="h-20 w-20 rounded-full" />
           </div>
         </div>
-        <p className="text-center text-sm text-muted-foreground mt-8">
+        <p className="mt-8 flex items-center justify-center gap-2 text-center text-[12px] font-semibold text-muted-foreground">
+          {!startError && (
+            <span className="led led-live bg-sage-deep text-sage-deep/40" aria-hidden />
+          )}
           {startError
             ? "Interview not started."
             : isStarting
-              ? "Generating your interview questions..."
-              : "Connecting to interview session..."}
+              ? "Generating your interview questions…"
+              : "Connecting to interview session…"}
         </p>
-        <div className="flex justify-center mt-4">
+        <div className="mt-4 flex justify-center">
           <ConnectionStatus
             status={interview.connectionStatus}
             onReconnect={interview.reconnect}
@@ -500,15 +573,19 @@ export default function InterviewPage() {
   // Complete state
   if (phase === "complete") {
     return (
-      <div className="container max-w-3xl py-12">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-foreground">
-            Interview Complete
+      <div className="container max-w-3xl py-12 sm:py-20">
+        <div className="tile flex flex-col items-center gap-4 bg-sage px-6 py-12 text-center text-sage-deep animate-pop-in">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-1.5 border-ink bg-card text-sage-deep shadow-pop">
+            <Check className="h-8 w-8" strokeWidth={3} aria-hidden />
+          </div>
+          <p className="eyebrow text-sage-deep">Interview complete</p>
+          <h2 className="text-2xl text-sage-deep sm:text-3xl">
+            That was the last question.
           </h2>
-          <p className="text-muted-foreground">
-            Generating your coaching report...
+          <p className="flex items-center gap-2 text-[13px] font-semibold">
+            <span className="led led-live bg-sage-deep text-sage-deep/40" aria-hidden />
+            Building your report…
           </p>
-          <Skeleton className="h-2 w-48 mx-auto" />
         </div>
       </div>
     );
@@ -517,19 +594,27 @@ export default function InterviewPage() {
   // Shared interview controls (used in both layouts)
   const interviewControls = (
     <>
-      {/* Header */}
+      {/* Header: company · role | step rail | timer · connection */}
       <InterviewHeader
         companyName={sessionMeta?.companyName || "Interview"}
         jobTitle={sessionMeta?.jobTitle || ""}
         difficulty={sessionMeta?.difficulty || "MID"}
         questionOrder={interview.currentQuestion?.order || 0}
         questionTotal={interview.currentQuestion?.total || 0}
-      />
-
-      {/* Progress */}
-      <ProgressBar
-        current={interview.currentQuestion?.order || 0}
-        total={interview.currentQuestion?.total || 0}
+        isRecording={phase === "recording"}
+        progress={
+          <ProgressBar
+            current={interview.currentQuestion?.order || 0}
+            total={interview.currentQuestion?.total || 0}
+            isFollowUp={isFollowUp}
+          />
+        }
+        status={
+          <ConnectionStatus
+            status={interview.connectionStatus}
+            onReconnect={interview.reconnect}
+          />
+        }
       />
 
       {/* Errors */}
@@ -546,29 +631,23 @@ export default function InterviewPage() {
 
       {/* Current stage indicator (Full Loop mode) */}
       {interview.currentStage && phase !== "stage_transition" && (
-        <div className="text-center">
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">
+        <div className="flex justify-center">
+          <span className="pill bg-lavender text-lavender-deep">
+            <Layers className="h-3 w-3" aria-hidden />
             {interview.currentStage}
           </span>
         </div>
       )}
 
-      {/* Transition feedback from previous answer */}
-      {interview.transitionMessage && phase === "transition" && (
-        <TransitionCard
-          message={interview.transitionMessage}
-          score={interview.evaluation?.score}
-          tier={interview.evaluation?.tier}
-        />
-      )}
-
-      {/* Current question */}
+      {/* Current question — keyed by id so each question pops in fresh */}
       {interview.currentQuestion && (
         <QuestionCard
+          key={interview.currentQuestion.questionId}
           text={interview.currentQuestion.text}
           category={interview.currentQuestion.category}
           order={interview.currentQuestion.order}
           total={interview.currentQuestion.total}
+          isFollowUp={isFollowUp}
         />
       )}
 
@@ -587,8 +666,8 @@ export default function InterviewPage() {
         />
       )}
 
-      {/* Record button */}
-      <div className="flex justify-center">
+      {/* Record button — sticks to the bottom edge on small screens */}
+      <div className="sticky bottom-0 z-20 -mx-4 flex flex-col items-center gap-3 bg-paper/85 px-4 py-3 backdrop-blur-md sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <RecordButton
           phase={toRecordPhase(phase)}
           audioLevel={recorder.audioLevel}
@@ -596,21 +675,24 @@ export default function InterviewPage() {
           onStart={handleStartRecording}
           onStop={handleStopRecording}
         />
+        <p className="hidden items-center justify-center gap-2 pb-2 text-[10px] text-muted-foreground sm:flex print:hidden">
+          <span className="kbd">Space</span> record · stop
+          <span className="kbd ml-2">R</span> replay the question
+        </p>
       </div>
 
-      {/* Transcript preview */}
+      {/* Transcript preview + score tile */}
       <TranscriptPreview
         transcript={interview.transcript}
         isProcessing={phase === "processing"}
+        score={interview.evaluation?.score}
+        tier={interview.evaluation?.tier}
       />
 
-      {/* Connection status */}
-      <div className="flex justify-center">
-        <ConnectionStatus
-          status={interview.connectionStatus}
-          onReconnect={interview.reconnect}
-        />
-      </div>
+      {/* The interviewer's remark before the next question */}
+      {interview.transitionMessage && phase === "transition" && (
+        <TransitionCard message={interview.transitionMessage} />
+      )}
     </>
   );
 
@@ -632,10 +714,10 @@ export default function InterviewPage() {
     );
   }
 
-  // Audio-only layout (unchanged)
+  // Audio-only layout
   return (
-    <div className="container max-w-3xl py-8">
-      <div className="space-y-6">
+    <div className="container max-w-3xl py-6 sm:py-8">
+      <div className="space-y-5">
         {interviewControls}
       </div>
     </div>

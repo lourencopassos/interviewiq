@@ -1,32 +1,28 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search } from "lucide-react";
 
 export default function NotFound() {
   return (
     <div className="container max-w-lg py-24">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <Search className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <CardTitle>Page Not Found</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            The page you&apos;re looking for doesn&apos;t exist or has been moved.
-          </p>
-          <div className="flex justify-center gap-3">
-            <Button asChild>
-              <Link href="/">Go Home</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/new">Start Interview</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="tile-pop bg-butter p-6 text-butter-deep sm:p-8">
+        <div className="flex items-center justify-between gap-3">
+          <p className="eyebrow text-current opacity-80">[ 404 ] not found</p>
+          <Search className="h-4 w-4 shrink-0" aria-hidden />
+        </div>
+        <h1 className="mt-2 text-2xl text-current">Nothing lives at this address.</h1>
+        <p className="mt-2 text-[13px] leading-relaxed opacity-90">
+          The page may have moved, or the link was never right.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/">Go home</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/new">Start an interview</Link>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

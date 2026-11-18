@@ -2,44 +2,222 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/* Tokens — warm paper, ink, pastel tiles. Light is the default.       */
+/* ------------------------------------------------------------------ */
 @layer base {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 5.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 5.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --radius: 0.5rem;
+    --paper: #f4ebe0;
+    --paper-2: #f7efe4;
+    --sheet: #f9f2e8;
+    --card: #f8f0e6;
+
+    --ink: #1d1b18;
+    --ink-2: #34302b;
+    --muted: #6f6961;
+    --muted-2: #8b847a;
+
+    --line: #ddd3c5;
+    --line-soft: #e6ddd0;
+    --line-strong: #c6bbac;
+    --drop: #1d1b18;
+
+    --sage: #cfe3b2;
+    --sage-deep: #24521c;
+    --butter: #fde3a7;
+    --butter-deep: #6d4a0c;
+    --peach: #fcdcbd;
+    --peach-deep: #8a4a1e;
+    --lavender: #e7ddf5;
+    --lavender-deep: #4a3690;
+    --sky: #d6e5f6;
+    --sky-deep: #1f4f80;
+    --blush: #f8d5cf;
+    --blush-deep: #8f2a22;
+    --rust: #d0683a;
+
+    --radius: 12px;
+    --card-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      0 1px 0 rgba(80, 60, 35, 0.05),
+      0 18px 40px -30px rgba(80, 60, 35, 0.45);
+    --grid-dot: rgba(29, 27, 24, 0.09);
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --paper: #211e1a;
+    --paper-2: #25211c;
+    --sheet: #28241f;
+    --card: #26231e;
+
+    --ink: #efe6d6;
+    --ink-2: #ddd3c2;
+    --muted: #a3998b;
+    --muted-2: #8d7f6c;
+
+    --line: #342f28;
+    --line-soft: #29251f;
+    --line-strong: #4f473d;
+    --drop: #050403;
+
+    --sage: #3f4c2b;
+    --sage-deep: #cfe3b2;
+    --butter: #5a4a22;
+    --butter-deep: #fde3a7;
+    --peach: #5a4531;
+    --peach-deep: #fcdcbd;
+    --lavender: #493563;
+    --lavender-deep: #e7ddf5;
+    --sky: #2d4257;
+    --sky-deep: #d6e5f6;
+    --blush: #5c2f2a;
+    --blush-deep: #f8d5cf;
+    --rust: #d97a4f;
+
+    --card-shadow:
+      inset 0 1px 0 rgba(255, 240, 220, 0.04),
+      0 1px 0 rgba(0, 0, 0, 0.11),
+      0 10px 22px -16px rgba(0, 0, 0, 0.63);
+    --grid-dot: rgba(239, 230, 214, 0.07);
+
+    color-scheme: dark;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-line;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-paper text-ink font-mono text-[13px] leading-relaxed;
+    background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: var(--butter);
+    color: var(--ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  h1, h2, h3, h4 {
+    @apply font-extrabold tracking-tight text-ink;
+    letter-spacing: -0.02em;
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Components — the tile language                                      */
+/* ------------------------------------------------------------------ */
+@layer components {
+  /* A bordered paper tile with the soft card shadow. */
+  .tile {
+    @apply rounded-tile border-1.5 border-ink bg-card text-ink;
+    box-shadow: var(--card-shadow);
+  }
+  /* A tile that pops: hard offset shadow, lifts on hover, presses on click. */
+  .tile-pop {
+    @apply rounded-tile border-1.5 border-ink bg-card text-ink shadow-pop;
+    transition:
+      transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      background-color 160ms;
+  }
+  .tile-pop-hover:hover {
+    transform: translate(-1px, -1px);
+    @apply shadow-pop-lg;
+  }
+  .tile-pop-press:active {
+    transform: translate(2px, 3px);
+    @apply shadow-pop-none;
+  }
+  /* Quiet surface with a soft line, for grouping. */
+  .sheet {
+    @apply rounded-tile border border-line bg-sheet;
+    box-shadow: var(--card-shadow);
+  }
+  /* Uppercase mono eyebrow, the "06. ARCHITECTURE / LESSON 1 OF 4" voice. */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+  /* Keyboard hint chip: [R] */
+  .kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-[5px] border border-line-strong bg-sheet px-1.5 text-[10px] font-semibold text-ink-2;
+    box-shadow: 0 1px 0 var(--line-strong);
+  }
+  /* Status LED */
+  .led {
+    @apply inline-block h-2 w-2 rounded-full;
+    box-shadow: 0 0 0 2px var(--card), 0 0 0 3px currentColor;
+  }
+  .led-live {
+    animation: ring-pulse 1.4s ease-out infinite;
+  }
+  /* Pill badge with ink border (reference's "Intermediate" / "12 steps") */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border-1.5 border-ink px-2.5 py-0.5 text-[11px] font-semibold text-ink;
+  }
+  /* Thin dashed schematic connector */
+  .connector {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 6;
+    fill: none;
+  }
+  .connector-flow {
+    animation: dash-flow 1.2s linear infinite;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .reveal {
+    opacity: 0;
+    transform: translateY(12px);
+    transition:
+      opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+      transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Print (report export)                                               */
+/* ------------------------------------------------------------------ */
 @media print {
   body {
     background: white !important;
     color: black !important;
+    font-size: 12px;
   }
   .print\:hidden {
     display: none !important;
@@ -47,8 +225,11 @@
   .print\:block {
     display: block !important;
   }
-  * {
-    border-color: #e5e7eb !important;
+  .tile,
+  .tile-pop,
+  .sheet {
+    box-shadow: none !important;
+    border-color: #999 !important;
   }
   [class*="bg-"] {
     background: transparent !important;
@@ -60,7 +241,6 @@
   .grid-rows-\[0fr\] {
     grid-template-rows: 1fr !important;
   }
-  /* Page breaks */
   h3 {
     page-break-before: auto;
     page-break-after: avoid;

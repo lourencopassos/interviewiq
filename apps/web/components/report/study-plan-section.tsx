@@ -1,106 +1,133 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, Clock, ExternalLink } from "lucide-react";
-import { cn } from "@interviewiq/ui/lib/utils";
+import { ChevronDown, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { StudyPlanItem } from "@interviewiq/types";
 
 interface StudyPlanSectionProps {
   studyPlan: StudyPlanItem[];
 }
 
-const resourceTypeColors: Record<string, string> = {
-  book: "bg-blue-500/20 text-blue-400",
-  course: "bg-purple-500/20 text-purple-400",
-  practice: "bg-green-500/20 text-green-400",
-  article: "bg-yellow-500/20 text-yellow-400",
+const resourceTone: Record<StudyPlanItem["resources"][number]["type"], string> = {
+  book: "bg-sky text-sky-deep",
+  course: "bg-lavender text-lavender-deep",
+  practice: "bg-sage text-sage-deep",
+  article: "bg-butter text-butter-deep",
 };
 
 function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) {
   const [isOpen, setIsOpen] = useState(false);
+  const panelId = `study-plan-${index}`;
 
   return (
-    <Card className="overflow-hidden">
+    <div className="tile overflow-hidden">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-sheet"
       >
-        <div className="flex items-center gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium">
-            {index + 1}
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-1.5 border-ink bg-ink text-[12px] font-bold tabular-nums text-paper">
+            {String(index + 1).padStart(2, "0")}
           </span>
-          <span className="font-medium">{item.topic}</span>
+          <span className="truncate font-semibold text-ink">{item.topic}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="gap-1">
-            <Clock className="h-3 w-3" />
-            {item.estimatedHours}h
-          </Badge>
-          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="pill bg-card tabular-nums">{item.estimatedHours}h</span>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform duration-200",
+              isOpen && "rotate-180",
+            )}
+          />
         </div>
       </button>
 
       <div
+        id={panelId}
         className={cn(
-          "grid transition-all duration-200",
+          "grid transition-[grid-template-rows] duration-200 ease-pop",
           isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
       >
         <div className="overflow-hidden">
-          <CardContent className="border-t pt-4 space-y-4">
+          <div className="space-y-4 border-t border-line p-4">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Why it matters</p>
-              <p className="text-sm">{item.whyItMatters}</p>
+              <p className="eyebrow">why it matters</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{item.whyItMatters}</p>
             </div>
 
             {item.resources.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Resources</p>
-                <div className="space-y-2">
-                  {item.resources.map((r, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Badge className={resourceTypeColors[r.type]}>{r.type}</Badge>
-                      {r.url ? (
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline flex items-center gap-1"
-                        >
-                          {r.title}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      ) : (
-                        <span className="text-sm">{r.title}</span>
-                      )}
-                    </div>
-                  ))}
+                <p className="eyebrow mb-2">resources</p>
+                <div className="flex flex-wrap gap-2">
+                  {item.resources.map((r, i) => {
+                    const pillClass = cn(
+                      "pill gap-2 bg-card py-1 font-medium",
+                      r.url &&
+                        "transition-[transform,box-shadow] duration-150 ease-pop hover:-translate-x-px hover:-translate-y-px hover:shadow-pop-sm",
+                    );
+                    const body = (
+                      <>
+                        <span className={cn("rounded-[4px] px-1 py-px", resourceTone[r.type])}>
+                          <span className="eyebrow text-[9px] text-current">{r.type}</span>
+                        </span>
+                        <span className="text-ink">{r.title}</span>
+                        {r.url && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
+                      </>
+                    );
+                    return r.url ? (
+                      <a
+                        key={i}
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={pillClass}
+                      >
+                        {body}
+                      </a>
+                    ) : (
+                      <span key={i} className={pillClass}>
+                        {body}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Practice prompt</p>
-              <p className="text-sm italic">&ldquo;{item.practicePrompt}&rdquo;</p>
+            <div className="rounded-md border-1.5 border-ink bg-lavender p-3 text-lavender-deep">
+              <p className="eyebrow text-current opacity-80">practice prompt</p>
+              <p className="mt-1 text-[13px] leading-relaxed">&ldquo;{item.practicePrompt}&rdquo;</p>
             </div>
-          </CardContent>
+          </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
 export function StudyPlanSection({ studyPlan }: StudyPlanSectionProps) {
   if (studyPlan.length === 0) return null;
 
+  const totalHours = studyPlan.reduce((sum, item) => sum + item.estimatedHours, 0);
+
   return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-semibold">Study Plan</h3>
-      {studyPlan.map((item, i) => (
-        <StudyPlanCard key={i} item={item} index={i} />
-      ))}
-    </div>
+    <section aria-label="Study plan">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="eyebrow">
+          <span className="text-ink">[ study plan ]</span> ordered by what moves your score most
+        </p>
+        <span className="pill bg-lavender text-lavender-deep tabular-nums">{totalHours}h total</span>
+      </div>
+      <div className="space-y-3">
+        {studyPlan.map((item, i) => (
+          <StudyPlanCard key={i} item={item} index={i} />
+        ))}
+      </div>
+    </section>
   );
 }

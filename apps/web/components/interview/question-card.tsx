@@ -1,13 +1,15 @@
 "use client";
 
+import { Mic, CornerDownRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 
 interface QuestionCardProps {
   text: string;
   category: string;
   order: number;
   total: number;
+  /** Marks an adaptive follow-up inserted after a weak answer. */
+  isFollowUp?: boolean;
 }
 
 const categoryLabels: Record<string, string> = {
@@ -17,30 +19,47 @@ const categoryLabels: Record<string, string> = {
   culture_fit: "Culture Fit",
 };
 
-const categoryColors: Record<string, string> = {
-  technical: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  behavioral: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  system_design: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  culture_fit: "bg-violet-500/20 text-violet-400 border-violet-500/30",
+const categoryTone: Record<string, "sky" | "sage" | "butter" | "lavender"> = {
+  technical: "sky",
+  behavioral: "sage",
+  system_design: "butter",
+  culture_fit: "lavender",
 };
 
-export function QuestionCard({ text, category, order, total }: QuestionCardProps) {
+/** The interviewer's row: peach avatar tile, eyebrow, and the question itself. */
+export function QuestionCard({
+  text,
+  category,
+  order,
+  total,
+  isFollowUp = false,
+}: QuestionCardProps) {
   return (
-    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 border-border/50 bg-card/50">
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Badge
-            variant="outline"
-            className={categoryColors[category] || ""}
-          >
-            {categoryLabels[category] || category}
-          </Badge>
-          <span className="text-xs text-muted-foreground">
-            Question {order} of {total}
-          </span>
+    <article className="tile animate-pop-in p-5 sm:p-6">
+      <div className="flex gap-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border-1.5 border-ink bg-peach text-peach-deep shadow-pop-sm">
+          <Mic className="h-5 w-5" />
         </div>
-        <p className="text-lg text-foreground leading-relaxed">{text}</p>
-      </CardContent>
-    </Card>
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="eyebrow">
+              Interviewer · question <span className="tabular-nums">{order}</span> of{" "}
+              <span className="tabular-nums">{total}</span>
+            </span>
+            {isFollowUp && (
+              <span className="pill animate-pop-in bg-lavender text-lavender-deep">
+                <CornerDownRight className="h-3 w-3" /> follow-up
+              </span>
+            )}
+            <Badge variant={categoryTone[category] ?? "outline"} className="ml-auto">
+              {categoryLabels[category] || category}
+            </Badge>
+          </div>
+          <p className="text-[16px] font-medium leading-relaxed text-ink sm:text-[17px]">
+            {text}
+          </p>
+        </div>
+      </div>
+    </article>
   );
 }

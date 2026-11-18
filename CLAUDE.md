@@ -14,7 +14,7 @@ Key architectural decisions:
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS, shadcn/ui (in apps/web), Zustand (UI state only), dark mode only
+- **Frontend**: Next.js 15 (App Router), Tailwind CSS, shadcn/ui (in apps/web), Zustand (UI state only). Warm-paper light theme by default with a dark toggle; tokens and tile language documented in `docs/design-system.md`
 - **Real-time**: Server-Sent Events (SSE) for interview event streaming
 - **Database**: Prisma with PostgreSQL (Docker Compose for local dev)
 - **AI**: Anthropic Claude (claude-sonnet) for all prompts + web_search tool
@@ -153,7 +153,8 @@ DATABASE_URL=              # Prisma connection string (default: postgresql://int
 ### Components
 - shadcn/ui as base component library in `packages/ui`
 - App-specific components in `apps/web/components/`
-- Use Tailwind CSS utility classes, no custom CSS files
+- Use Tailwind CSS utility classes; shared tile classes (`.tile`, `.tile-pop`, `.sheet`, `.eyebrow`, `.pill`, `.kbd`, `.led`) live in `app/globals.css` and are documented in `docs/design-system.md`
+- Colors come from the paper/ink/pastel tokens so light and dark both work; never hardcode zinc/gray palettes
 - Responsive: desktop-first, mobile-functional
 - Interview components are **event-reactive** (driven by SSE, not local state)
 
