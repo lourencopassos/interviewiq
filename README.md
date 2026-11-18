@@ -21,6 +21,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how the real-time pipeline works and 
 - Interview types: phone screen, technical, behavioral, system design, and **Full Loop** (all four stages in one session with spoken transitions)
 - Difficulty levels junior to staff; interviews in English, Brazilian Portuguese or Spanish
 - Interface in English, Português or Español, switchable from the nav
+- **Pause and ask the coach**: pause any time (nothing runs and nothing is billed while paused), highlight part of the question or your transcript and get it explained by a small, cheap model. Asking before you answer is marked in the report; the study plan uses what you asked.
 - Optional resume/CV text so questions reference your background
 - Coaching report with verdict, four dimension scores, study plan with resources, per-question review, and PDF export via print
 - Session history, resume of interrupted interviews, and refresh-safe state (everything authoritative lives in Postgres)
@@ -59,7 +60,8 @@ Open `http://localhost:3000/new`, paste a job description, pick the interview ty
 | `OPENAI_API_KEY` | yes | Whisper transcription of your answers |
 | `ELEVENLABS_API_KEY` | yes | Interviewer voice |
 | `DATABASE_URL` | yes | Postgres connection string. Default matches `docker-compose.yml`. |
-| `CLAUDE_MODEL` | no | Override the Claude model id. Default `claude-sonnet-5`. |
+| `CLAUDE_MODEL` | no | Override the Claude model id for the interviewer. Default `claude-sonnet-5`. |
+| `COACH_MODEL` | no | Model for the mid-interview coach. Default `claude-haiku-4-5`. |
 | `ELEVENLABS_VOICE_EN` / `_PT_BR` / `_ES` | no | Override the ElevenLabs voice id per interview language |
 | `DID_API_KEY` | no | Enables the video interviewer |
 | `DID_PRESENTER_URL` | no | Portrait image for the avatar. Defaults to a public D-ID sample. |
@@ -104,7 +106,7 @@ That design does **not** fit multi-instance serverless hosting such as Vercel fu
 
 ## Costs
 
-Every interview makes real API calls: one Claude call per question set, one per answer, one for the report, one Whisper call per answer, and one ElevenLabs call per spoken line. Full Loop runs four question sets and 15 to 20 answers. Use mock mode while developing.
+Every interview makes real API calls: one Claude call per question set, one per answer, one for the report, one Whisper call per answer, and one ElevenLabs call per spoken line. Coach questions are extra, on the cheaper `COACH_MODEL`, and only when you ask; pausing costs nothing. Full Loop runs four question sets and 15 to 20 answers. Use mock mode while developing.
 
 ## Contributing
 
