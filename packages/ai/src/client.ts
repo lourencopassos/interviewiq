@@ -204,13 +204,15 @@ export async function callClaudePlainText(
 export async function* streamClaudeText(
   systemPrompt: string,
   userMessage: string,
-  options: { model?: string; maxTokens?: number; mockText?: string } = {},
+  options: { model?: string; maxTokens?: number; mockText?: string; signal?: AbortSignal } = {},
 ): AsyncGenerator<string, void, void> {
+  options.signal?.throwIfAborted();
   if (isMockMode()) {
     const text = options.mockText ?? "This is a mock coach answer.";
     for (const word of text.split(/(\s+)/)) {
       if (!word) continue;
       await delay(18);
+      options.signal?.throwIfAborted();
       yield word;
     }
     return;
@@ -221,7 +223,7 @@ export async function* streamClaudeText(
     max_tokens: options.maxTokens ?? 1024,
     system: systemPrompt,
     messages: [{ role: "user", content: userMessage }],
-  });
+  }, { signal: options.signal });
 
   for await (const event of stream) {
     if (event.type === "content_block_delta" && event.delta.type === "text_delta") {

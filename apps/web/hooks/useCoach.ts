@@ -1,5 +1,6 @@
 "use client";
 
+import { getClientId } from "@/lib/client-id";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CoachNoteView, CoachRequest, CoachStreamEvent } from "@interviewiq/types";
 
@@ -25,7 +26,7 @@ export function useCoach(sessionId: string, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    fetch(`/api/interview/${sessionId}/coach`)
+    fetch(`/api/interview/${sessionId}/coach`, { headers: { "x-client-id": getClientId() } })
       .then((r) => (r.ok ? r.json() : { notes: [] }))
       .then((data: { notes?: CoachNoteView[]; model?: string }) => {
         if (cancelled) return;
@@ -56,7 +57,7 @@ export function useCoach(sessionId: string, enabled: boolean) {
       try {
         const res = await fetch(`/api/interview/${sessionId}/coach`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-client-id": getClientId() },
           body: JSON.stringify(request),
           signal: controller.signal,
         });

@@ -49,6 +49,7 @@ export async function listCoachNotes(sessionId: string): Promise<CoachNoteView[]
 export async function* streamCoachAnswer(
   sessionId: string,
   request: CoachRequest,
+  signal: AbortSignal,
 ): AsyncGenerator<string, CoachNoteView, void> {
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
@@ -98,9 +99,9 @@ export async function* streamCoachAnswer(
 
   const priorNotes = await prisma.coachNote.findMany({
     where: { sessionId },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: { prompt: true, answer: true },
-    take: 6,
+    take: 3,
   });
 
   const systemPrompt = buildCoachSystemPrompt({
@@ -112,7 +113,7 @@ export async function* streamCoachAnswer(
       ? { text: question.text, category: question.category, targetSkill }
       : null,
     transcript: question?.transcript ?? null,
-    priorNotes,
+    priorNotes: priorNotes.reverse(),
   });
   const userMessage = buildCoachUserMessage(request);
 
@@ -121,12 +122,14 @@ export async function* streamCoachAnswer(
   for await (const delta of streamClaudeText(systemPrompt, userMessage, {
     model: COACH_MODEL,
     maxTokens: 900,
+    signal,
     mockText: getMockCoachAnswer(request.selection, request.prompt),
   })) {
     answer += delta;
     yield delta;
   }
 
+  signal.throwIfAborted();
   const note = await prisma.coachNote.create({
     data: {
       sessionId,

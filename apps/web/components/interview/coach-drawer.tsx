@@ -136,6 +136,7 @@ export function CoachDrawer({
   return (
     <aside
       aria-label={C.title}
+      inert={!open}
       aria-hidden={!open}
       className={cn(
         "fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh] flex-col transition-transform duration-300 ease-pop sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[26rem] sm:p-3",

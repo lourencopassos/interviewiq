@@ -22,7 +22,6 @@ export function buildCoachSystemPrompt(ctx: CoachContext): string {
 
   const prior = ctx.priorNotes.length
     ? `Earlier in this session the candidate asked you:\n${ctx.priorNotes
-        .slice(-3)
         .map((n) => `- Q: ${n.prompt}\n  A: ${n.answer.slice(0, 300)}`)
         .join("\n")}`
     : "";

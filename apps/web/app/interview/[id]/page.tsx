@@ -36,6 +36,7 @@ type InterviewPhase =
   | "loading"
   | "speaking"
   | "ready_to_record"
+  | "starting_recording"
   | "recording"
   | "processing"
   | "transition"
@@ -293,9 +294,11 @@ export default function InterviewPage() {
     setRecordError(null);
     setSubmitError(null);
     try {
+      setPhase("starting_recording");
       await recorder.startRecording();
       setPhase("recording");
     } catch (err) {
+      setPhase("ready_to_record");
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         // permissionState becomes "denied"; the mic alert covers it
         return;
@@ -399,16 +402,15 @@ export default function InterviewPage() {
 
   const pause = useCallback(() => {
     if (!canPause) return;
-    if (phase === "speaking") {
-      playback.stop();
-      setPhase("ready_to_record");
-    }
+    playback.pause();
     setPaused(true);
-  }, [canPause, phase, playback]);
+  }, [canPause, playback]);
 
   const resume = useCallback(() => {
+    setCoachOpen(false);
     setPaused(false);
-  }, []);
+    playback.resume();
+  }, [playback]);
 
   const togglePause = useCallback(() => {
     if (paused) resume();
@@ -416,8 +418,8 @@ export default function InterviewPage() {
   }, [paused, pause, resume]);
 
   const openCoach = useCallback(() => {
-    if (!coachEnabled) return;
-    if (!paused && canPause) pause();
+    if (!coachEnabled || (!paused && !canPause)) return;
+    if (!paused) pause();
     setCoachOpen(true);
   }, [coachEnabled, paused, canPause, pause]);
 
@@ -741,6 +743,7 @@ export default function InterviewPage() {
                 size="sm"
                 variant="outline"
                 onClick={() => (coachOpen ? setCoachOpen(false) : openCoach())}
+                disabled={!paused && !canPause}
                 aria-pressed={coachOpen}
                 className={coachOpen ? "bg-lavender text-lavender-deep" : undefined}
                 title={t.interview.coach.open}
