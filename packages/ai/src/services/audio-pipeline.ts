@@ -1,0 +1,142 @@
+import { isMockMode, delay } from "../mock";
+import { getMockSilenceBuffer } from "../mock/mock-audio";
+import { getNextMockTranscript } from "../mock/fixtures/transcript";
+
+const EN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Rachel — professional, neutral
+const PT_VOICE_ID = "GBv7mTt0atIp3Br8iCZE"; // Thomas — multilingual, supports PT-BR
+
+export class AudioPipelineError extends Error {
+  constructor(
+    message: string,
+    public service: "whisper" | "elevenlabs",
+  ) {
+    super(message);
+    this.name = "AudioPipelineError";
+  }
+}
+
+/** Map a MediaRecorder mime type to something Whisper accepts, with a matching filename extension. */
+function normalizeAudioType(mimeType: string): { type: string; extension: string } {
+  const base = mimeType.split(";")[0].trim().toLowerCase();
+  switch (base) {
+    case "audio/mp4":
+    case "audio/x-m4a":
+    case "audio/m4a":
+      return { type: "audio/mp4", extension: "m4a" };
+    case "audio/ogg":
+      return { type: "audio/ogg", extension: "ogg" };
+    case "audio/wav":
+    case "audio/x-wav":
+      return { type: "audio/wav", extension: "wav" };
+    case "audio/mpeg":
+    case "audio/mp3":
+      return { type: "audio/mpeg", extension: "mp3" };
+    case "audio/webm":
+    default:
+      return { type: "audio/webm", extension: "webm" };
+  }
+}
+
+export class AudioPipeline {
+  async transcribe(
+    audioBuffer: Buffer,
+    language: string,
+    mimeType: string = "audio/webm",
+  ): Promise<string> {
+    if (isMockMode()) {
+      await delay(200);
+      console.log("[MOCK] transcribe — returning canned transcript");
+      return getNextMockTranscript();
+    }
+
+    const lang = language === "PT_BR" ? "pt" : "en";
+    const { type, extension } = normalizeAudioType(mimeType);
+
+    try {
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new Blob([new Uint8Array(audioBuffer)], { type }),
+        `answer.${extension}`,
+      );
+      formData.append("model", "whisper-1");
+      formData.append("language", lang);
+      formData.append(
+        "prompt",
+        lang === "pt"
+          ? "Esta é uma resposta de entrevista técnica sobre engenharia de software."
+          : "This is a technical interview answer about software engineering.",
+      );
+
+      const response = await fetch(
+        "https://api.openai.com/v1/audio/transcriptions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Whisper API ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      return result.text;
+    } catch (error) {
+      if (error instanceof AudioPipelineError) throw error;
+      throw new AudioPipelineError(
+        `Whisper transcription failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "whisper",
+      );
+    }
+  }
+
+  async synthesize(text: string, language: string): Promise<Buffer> {
+    if (isMockMode()) {
+      await delay(150);
+      console.log("[MOCK] synthesize — returning silence buffer");
+      return getMockSilenceBuffer();
+    }
+
+    const voiceId = language === "PT_BR" ? PT_VOICE_ID : EN_VOICE_ID;
+
+    try {
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": process.env.ELEVENLABS_API_KEY || "",
+          },
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_turbo_v2_5",
+            voice_settings: {
+              stability: 0.6,
+              similarity_boost: 0.8,
+            },
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`ElevenLabs API ${response.status}: ${errorText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch (error) {
+      if (error instanceof AudioPipelineError) throw error;
+      throw new AudioPipelineError(
+        `ElevenLabs TTS failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "elevenlabs",
+      );
+    }
+  }
+}
