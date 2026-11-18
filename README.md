@@ -11,7 +11,7 @@ It is self-hosted and bring-your-own-keys. Nothing is sent anywhere except the A
 - **Text to speech:** ElevenLabs
 - **Optional video interviewer:** D-ID real-time avatar over WebRTC
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for how the real-time pipeline works.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the real-time pipeline works and [docs/design-system.md](docs/design-system.md) for the UI language.
 
 ## Features
 
