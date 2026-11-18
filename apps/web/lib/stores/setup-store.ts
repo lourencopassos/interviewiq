@@ -30,6 +30,7 @@ interface SetupStore {
   interviewType: InterviewType;
   language: Language;
   videoMode: boolean;
+  coachEnabled: boolean;
 
   // Flow state
   step: SetupStep;
@@ -44,6 +45,7 @@ interface SetupStore {
   setInterviewType: (t: InterviewType) => void;
   setLanguage: (l: Language) => void;
   setVideoMode: (v: boolean) => void;
+  setCoachEnabled: (v: boolean) => void;
   analyzeJob: () => Promise<void>;
   clearAnalysis: () => void;
   reset: () => void;
@@ -56,6 +58,7 @@ const initialState = {
   interviewType: "TECHNICAL" as InterviewType,
   language: "EN" as Language,
   videoMode: false,
+  coachEnabled: true,
   step: "input" as SetupStep,
   parsedJob: null,
   companyIntel: null,
@@ -71,6 +74,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   setInterviewType: (t) => set({ interviewType: t }),
   setLanguage: (l) => set({ language: l }),
   setVideoMode: (v) => set({ videoMode: v }),
+  setCoachEnabled: (v) => set({ coachEnabled: v }),
 
   analyzeJob: async () => {
     const { jobDescription } = get();

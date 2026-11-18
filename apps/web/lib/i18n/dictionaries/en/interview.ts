@@ -80,6 +80,7 @@ export const interview = {
   shortcuts: {
     record: "record · stop",
     replay: "replay the question",
+    pause: "pause · resume",
   },
   complete: {
     eyebrow: "Interview complete",
@@ -128,6 +129,32 @@ export const interview = {
     NO_QUESTION: "No current question found.",
     REPORT_FAILED:
       "We couldn't generate your report. Your answers are saved — you can retry from the report page.",
+  },
+  pause: {
+    eyebrow: "take a breath",
+    title: "Paused",
+    body: "The interviewer is waiting. Nothing runs on the server while you're paused: the timer stops, recording is off, and you can read the question as long as you like.",
+    noTokens: "no tokens are spent while paused",
+    button: "Pause",
+    resume: "Resume",
+    askCoach: "Ask the coach",
+  },
+  coach: {
+    title: "Coach",
+    eyebrow: "ask about this question",
+    open: "Coach",
+    close: "Close coach",
+    explainThis: "Explain this",
+    placeholder: "Ask about the question or your answer…",
+    send: "Ask",
+    cancel: "Stop",
+    thinking: "Thinking…",
+    empty: "Highlight part of the question or your answer and choose “Explain this”, or type a question below.",
+    beforeAnswer: "asked before answering · marked in the report",
+    afterAnswer: "asked after answering",
+    otherQuestions: "Earlier questions",
+    model: "model",
+    disabled: "The coach is off for this session.",
   },
   errorPage: {
     eyebrow: "Interview session",

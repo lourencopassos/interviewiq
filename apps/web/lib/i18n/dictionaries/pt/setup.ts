@@ -69,6 +69,12 @@ export const setup: typeof En = {
     on: "Vídeo ligado",
     off: "Vídeo desligado",
   },
+  coach: {
+    title: "Coach disponível durante a entrevista",
+    body: "Pause a qualquer momento para perguntar sobre a pergunta ou a sua resposta. Usa um modelo pequeno e barato; perguntar antes de responder fica marcado no relatório.",
+    on: "Coach ligado",
+    off: "Coach desligado",
+  },
   resume: {
     label: "Seu currículo",
     placeholder:
@@ -80,6 +86,7 @@ export const setup: typeof En = {
     video: "vídeo",
     audio: "áudio",
     withResume: "com currículo",
+    coachOff: "sem coach",
     titleAt: "{title} na {company}",
     creating: "Criando a sessão…",
     button: "Começar a entrevista",

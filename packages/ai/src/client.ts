@@ -12,6 +12,12 @@ import { getMockStageTransition } from "./mock/fixtures/stage-transition";
  */
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
 
+/**
+ * Cheaper model for the mid-interview coach ("explain this"). Each exchange is
+ * a few hundred tokens, so the default is the current Haiku. Override with COACH_MODEL.
+ */
+export const COACH_MODEL = process.env.COACH_MODEL || "claude-haiku-4-5";
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
   maxRetries: 0, // We handle retries ourselves for proper rate limit backoff
@@ -189,6 +195,41 @@ export async function callClaudePlainText(
   );
 
   return extractTextContent(response.content).trim();
+}
+
+/**
+ * Stream plain text from Claude as an async iterable of deltas.
+ * In mock mode yields the provided fixture in word-sized chunks.
+ */
+export async function* streamClaudeText(
+  systemPrompt: string,
+  userMessage: string,
+  options: { model?: string; maxTokens?: number; mockText?: string; signal?: AbortSignal } = {},
+): AsyncGenerator<string, void, void> {
+  options.signal?.throwIfAborted();
+  if (isMockMode()) {
+    const text = options.mockText ?? "This is a mock coach answer.";
+    for (const word of text.split(/(\s+)/)) {
+      if (!word) continue;
+      await delay(18);
+      options.signal?.throwIfAborted();
+      yield word;
+    }
+    return;
+  }
+
+  const stream = anthropic.messages.stream({
+    model: options.model ?? CLAUDE_MODEL,
+    max_tokens: options.maxTokens ?? 1024,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  }, { signal: options.signal });
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      yield event.delta.text;
+    }
+  }
 }
 
 function extractTextContent(content: ContentBlock[]): string {

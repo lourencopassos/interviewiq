@@ -12,6 +12,7 @@ import { AnalysisProgress } from "./analysis-progress";
 import { JobPreviewCard } from "./job-preview-card";
 import { StartInterviewButton } from "./start-interview-button";
 import { VideoModeToggle } from "./video-mode-toggle";
+import { CoachToggle } from "./coach-toggle";
 
 /**
  * Two columns on desktop. Left: the posting (hero input) and the analysis log.
@@ -88,6 +89,7 @@ export function SetupForm() {
           <div className="mt-5 space-y-6">
             <InterviewConfig />
             <VideoModeToggle disabled={isAnalyzing} />
+            <CoachToggle disabled={isAnalyzing} />
             <ResumeInput />
           </div>
         </section>

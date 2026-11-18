@@ -154,6 +154,10 @@ CompanyResearch  cache of research results keyed by normalised company name
 
 JSON is stored as text columns on purpose: the shapes are owned by Zod schemas in `packages/types`, and the typed columns exist for list views and as a fallback if the JSON cannot be parsed.
 
+## Pause and coach
+
+Pausing is a client-side hold. The server does nothing between answers (no timers, no polling), so pausing only stops the elapsed timer and blocks recording; nothing is billed. While paused, or any time the candidate is not mid-recording, highlighting text inside the question or their own transcript shows an "Explain this" button. That calls `POST /api/interview/[id]/coach`, which streams NDJSON deltas from a cheaper model (`COACH_MODEL`, default Haiku) with the question, its scoring guide, the transcript so far and the last few coach exchanges as context, then persists a `CoachNote`. Notes asked before the answer are flagged `askedBeforeAnswer`; the report marks those questions as coached, lists what was asked, and the report prompt treats asked-about topics as confirmed gaps for the study plan. Sessions can be created with `coachEnabled: false` to turn this off for a dress rehearsal.
+
 ## Languages
 
 Two independent settings:

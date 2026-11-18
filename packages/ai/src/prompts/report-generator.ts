@@ -16,6 +16,9 @@ interface QuestionWithAnswer {
   score: number;
   keyStrengths: string[];
   gaps: string[];
+  /** What the candidate asked the coach about this question, if anything. */
+  coachAsked?: string[];
+  coachedBeforeAnswer?: boolean;
 }
 
 function buildSystemPrompt(params: {
@@ -71,6 +74,7 @@ Generate a comprehensive coaching report as JSON:
 
 Be specific, honest, and constructive. Reference actual answer content.
 studyPlan should be prioritized — most impactful gaps first.
+If the candidate asked the coach about a topic during the interview, treat it as a confirmed gap: cover it in the study plan and, when they asked before answering, say so plainly in that question's assessment.
 Resources should be real, well-known references — no hallucinated URLs. Use null for url if unsure.
 Score calibrated to the ${difficulty} difficulty level.
 ${resumeText ? `
@@ -102,7 +106,11 @@ export async function generateCoachingReport(params: {
   const userMessage = `Question + answer transcript pairs:\n\n${questionsWithAnswers
     .map(
       (q, i) =>
-        `Question ${i + 1} [${q.category}]: ${q.text}\nAnswer: ${q.transcript}\nScore: ${q.score}/100\nStrengths: ${q.keyStrengths.join(", ") || "None noted"}\nGaps: ${q.gaps.join(", ") || "None noted"}`,
+        `Question ${i + 1} [${q.category}]: ${q.text}\nAnswer: ${q.transcript}\nScore: ${q.score}/100\nStrengths: ${q.keyStrengths.join(", ") || "None noted"}\nGaps: ${q.gaps.join(", ") || "None noted"}${
+          q.coachAsked && q.coachAsked.length
+            ? `\nAsked the coach${q.coachedBeforeAnswer ? " BEFORE answering" : " after answering"}: ${q.coachAsked.join(" | ")}`
+            : ""
+        }`,
     )
     .join("\n\n---\n\n")}`;
 

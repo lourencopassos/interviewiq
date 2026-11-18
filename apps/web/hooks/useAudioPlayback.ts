@@ -27,13 +27,16 @@ export function useAudioPlayback() {
 
   const queueRef = useRef<QueueItem[]>([]);
   const currentRef = useRef<QueueItem | null>(null);
+  const playAudioRef = useRef<(() => void) | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const pausedRef = useRef(false);
   const disposedRef = useRef(false);
 
   const finishCurrent = useCallback((error?: Error) => {
     const item = currentRef.current;
     currentRef.current = null;
+    playAudioRef.current = null;
     audioRef.current = null;
     utteranceRef.current = null;
     if (!item) return;
@@ -42,7 +45,7 @@ export function useAudioPlayback() {
   }, []);
 
   const processQueue = useCallback(() => {
-    if (disposedRef.current) return;
+    if (disposedRef.current || pausedRef.current) return;
     if (currentRef.current) return; // something is already playing
 
     const next = queueRef.current.shift();
@@ -110,9 +113,16 @@ export function useAudioPlayback() {
     audio.onended = () => settle();
     audio.onerror = () => settle(new Error("Audio playback failed"));
 
-    audio.play().catch((err: unknown) => {
-      settle(err instanceof Error ? err : new Error("Audio playback failed"));
-    });
+    let attempt = 0;
+    const playAudio = () => {
+      const currentAttempt = ++attempt;
+      audio.play().catch((err: unknown) => {
+        if (audioRef.current !== audio || pausedRef.current || currentAttempt !== attempt) return;
+        settle(err instanceof Error ? err : new Error("Audio playback failed"));
+      });
+    };
+    playAudioRef.current = playAudio;
+    playAudio();
   }, [finishCurrent]);
 
   /**
@@ -141,6 +151,7 @@ export function useAudioPlayback() {
 
   /** Pause the current clip (the queue is kept). */
   const pause = useCallback(() => {
+    pausedRef.current = true;
     if (typeof window !== "undefined" && window.speechSynthesis && utteranceRef.current) {
       window.speechSynthesis.pause();
     }
@@ -149,6 +160,20 @@ export function useAudioPlayback() {
     }
     setIsPlaying(false);
   }, []);
+
+  const resume = useCallback(() => {
+    if (!pausedRef.current) return;
+    pausedRef.current = false;
+    if (playAudioRef.current) {
+      setIsPlaying(true);
+      playAudioRef.current();
+    } else if (utteranceRef.current) {
+      setIsPlaying(true);
+      window.speechSynthesis.resume();
+    } else {
+      processQueue();
+    }
+  }, [processQueue]);
 
   /** Stop the current clip and drop everything queued behind it. */
   const stop = useCallback(() => {
@@ -192,5 +217,5 @@ export function useAudioPlayback() {
     };
   }, []);
 
-  return { isPlaying, play, enqueue, pause, stop };
+  return { isPlaying, play, enqueue, pause, resume, stop };
 }

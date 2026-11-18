@@ -113,6 +113,15 @@ export const report = {
       culture_fit: "culture fit",
     },
   },
+  coach: {
+    /** Pill next to a question the candidate asked the coach about before answering. */
+    coached: "coached",
+    whatYouAsked: "what you asked",
+    highlighted: "highlighted",
+    /** Title-strip pill when the session ran with the coach disabled. */
+    coachOff: "coach off",
+    model: "model",
+  },
   nextTips: {
     sectionLabel: "Tips for your next interview",
     eyebrow: "next time",

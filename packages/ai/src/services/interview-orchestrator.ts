@@ -879,16 +879,26 @@ export class InterviewOrchestrator {
       const session = await this.loadSession();
       const questions = await this.loadQuestions();
 
+      const coachNotes = await prisma.coachNote.findMany({
+        where: { sessionId: this.sessionId },
+        select: { questionId: true, prompt: true, selection: true, askedBeforeAnswer: true },
+      });
+
       const questionsWithAnswers = questions
         .filter((q) => q.transcript)
-        .map((q) => ({
-          text: q.text,
-          category: q.category,
-          transcript: q.transcript!,
-          score: q.score ?? 50,
-          keyStrengths: q.strengths,
-          gaps: q.gaps,
-        }));
+        .map((q) => {
+          const notes = coachNotes.filter((n) => n.questionId === q.id);
+          return {
+            text: q.text,
+            category: q.category,
+            transcript: q.transcript!,
+            score: q.score ?? 50,
+            keyStrengths: q.strengths,
+            gaps: q.gaps,
+            coachAsked: notes.map((n) => n.selection ? `"${n.selection.slice(0, 120)}" — ${n.prompt}` : n.prompt),
+            coachedBeforeAnswer: notes.some((n) => n.askedBeforeAnswer),
+          };
+        });
 
       if (questionsWithAnswers.length === 0) {
         throw new OrchestratorError(

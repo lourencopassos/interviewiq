@@ -68,6 +68,12 @@ export const setup = {
     on: "Video on",
     off: "Video off",
   },
+  coach: {
+    title: "Coach available during the interview",
+    body: "Pause any time to ask about the question or your answer. Uses a small, cheap model; asking before you answer is marked in the report.",
+    on: "Coach on",
+    off: "Coach off",
+  },
   resume: {
     label: "Your resume",
     placeholder:
@@ -79,6 +85,7 @@ export const setup = {
     video: "video",
     audio: "audio",
     withResume: "with resume",
+    coachOff: "coach off",
     titleAt: "{title} at {company}",
     creating: "Creating the session…",
     button: "Start the interview",

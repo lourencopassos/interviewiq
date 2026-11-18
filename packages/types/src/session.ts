@@ -82,6 +82,8 @@ export const createSessionRequestSchema = z.object({
   ]),
   language: z.enum(["EN", "PT_BR", "ES"]),
   videoMode: z.boolean().optional().default(false),
+  /** Allow pausing to ask the coach model about a question mid-interview. */
+  coachEnabled: z.boolean().optional().default(true),
   resumeText: z.string().max(20000).optional(),
   parsedJob: z.string().optional(),
   companyIntel: z.string().optional(),

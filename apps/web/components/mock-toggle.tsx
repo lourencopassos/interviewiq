@@ -22,7 +22,7 @@ export function MockToggle() {
     <button
       type="button"
       onClick={() => setEnabled(toggleMockMode())}
-      className={`tile-pop tile-pop-hover tile-pop-press fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] shadow-pop-sm print:hidden ${
+      className={`tile-pop tile-pop-hover tile-pop-press fixed bottom-4 left-16 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] shadow-pop-sm print:hidden ${
         enabled ? "bg-butter text-butter-deep" : "bg-card text-ink-2"
       }`}
       title={enabled ? t.common.mock.titleOn : t.common.mock.titleOff}

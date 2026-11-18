@@ -4,26 +4,7 @@ import { destroyOrchestrator } from "@interviewiq/ai";
 import { updateSessionRequestSchema } from "@interviewiq/types";
 import { readJson } from "@/lib/rate-limit";
 
-/**
- * Ownership is the anonymous clientId stored with the session. Mutating routes
- * require it; reads stay open because the interview/report pages fetch by id.
- */
-async function assertOwner(id: string, clientId: string | null) {
-  if (!clientId) {
-    return { ok: false as const, response: NextResponse.json({ error: "clientId is required" }, { status: 400 }) };
-  }
-  const session = await prisma.session.findUnique({
-    where: { id },
-    select: { id: true, clientId: true, status: true },
-  });
-  if (!session) {
-    return { ok: false as const, response: NextResponse.json({ error: "Session not found" }, { status: 404 }) };
-  }
-  if (session.clientId !== clientId) {
-    return { ok: false as const, response: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { ok: true as const, session };
-}
+import { assertOwner } from "@/lib/session-owner";
 
 export async function GET(
   _request: Request,
@@ -42,6 +23,7 @@ export async function GET(
         interviewType: true,
         language: true,
         videoMode: true,
+        coachEnabled: true,
         status: true,
         currentIndex: true,
         _count: { select: { questions: true } },

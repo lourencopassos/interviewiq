@@ -17,6 +17,10 @@ interface InterviewHeaderProps {
   progress?: ReactNode;
   /** Connection pill, rendered at the far right. */
   status?: ReactNode;
+  /** Pause / coach controls, rendered before the connection pill. */
+  actions?: ReactNode;
+  /** Freezes the elapsed timer. */
+  paused?: boolean;
 }
 
 const difficultyTone: Record<string, "sage" | "sky" | "butter" | "lavender"> = {
@@ -40,16 +44,19 @@ export function InterviewHeader({
   isRecording = false,
   progress,
   status,
+  actions,
+  paused = false,
 }: InterviewHeaderProps) {
   const { t } = useI18n();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
+    if (paused) return;
     const timer = setInterval(() => {
       setElapsed((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [paused]);
 
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
@@ -103,11 +110,15 @@ export function InterviewHeader({
             {questionOrder}/{questionTotal}
           </span>
           <time
-            className="rounded-md border border-line-strong bg-sheet px-2 py-0.5 text-[12px] font-semibold tabular-nums text-ink-2"
+            className={cn(
+              "rounded-md border border-line-strong bg-sheet px-2 py-0.5 text-[12px] font-semibold tabular-nums text-ink-2",
+              paused && "border-ink bg-butter text-butter-deep",
+            )}
             aria-label={t.interview.header.elapsed}
           >
             {timeStr}
           </time>
+          {actions}
           {status}
         </div>
       </header>

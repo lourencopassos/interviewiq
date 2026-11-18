@@ -112,6 +112,13 @@ export const report: typeof En = {
       culture_fit: "encaje cultural",
     },
   },
+  coach: {
+    coached: "con coach",
+    whatYouAsked: "lo que preguntaste",
+    highlighted: "fragmento destacado",
+    coachOff: "sin coach",
+    model: "modelo",
+  },
   nextTips: {
     sectionLabel: "Consejos para tu próxima entrevista",
     eyebrow: "la próxima vez",

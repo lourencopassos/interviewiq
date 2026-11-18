@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import type { CoachNoteView } from "@interviewiq/types";
 import { cn } from "@/lib/utils";
 import { interpolate, useI18n } from "@/lib/i18n";
 import { scoreTone, toneStyles } from "./score-tone";
@@ -16,6 +17,10 @@ interface ReviewQuestion {
   feedback: string | null;
   strengths: string[];
   gaps: string[];
+  /** Notes the candidate asked the coach for on this question, oldest first. */
+  coachNotes?: CoachNoteView[];
+  /** True when at least one of those notes was asked before the answer was recorded. */
+  coachedBeforeAnswer?: boolean;
 }
 
 interface QuestionReviewProps {
@@ -38,6 +43,8 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
   const categoryLabel =
     (copy.category as Record<string, string>)[question.category] ??
     question.category.replace(/_/g, " ");
+  const coachNotes = question.coachNotes ?? [];
+  const coachedBeforeAnswer = question.coachedBeforeAnswer ?? false;
 
   return (
     <div className="tile overflow-hidden">
@@ -56,6 +63,9 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
           <span className="truncate text-[13px] font-semibold text-ink">{question.text}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {coachedBeforeAnswer && (
+            <span className="pill bg-lavender text-lavender-deep">{t.report.coach.coached}</span>
+          )}
           <span className={cn("pill hidden sm:inline-flex", categoryTone[question.category] ?? "bg-card")}>
             {categoryLabel}
           </span>
@@ -95,6 +105,31 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
                   <span className="text-sky-deep">{copy.youSaid}</span>
                 </p>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{question.transcript}</p>
+              </div>
+            )}
+
+            {coachNotes.length > 0 && (
+              <div className="rounded-tile border-1.5 border-ink bg-lavender p-4 text-lavender-deep">
+                <p className="eyebrow text-current opacity-80">{t.report.coach.whatYouAsked}</p>
+                <ul className="mt-2 space-y-3">
+                  {coachNotes.map((note) => (
+                    <li key={note.id} className="space-y-1.5">
+                      {note.selection && (
+                        <blockquote className="sheet border-l-[3px] border-l-lavender-deep px-3 py-2 text-[12px] italic leading-relaxed text-ink-2">
+                          <span className="eyebrow mr-1.5 not-italic">{t.report.coach.highlighted}</span>
+                          &ldquo;{note.selection}&rdquo;
+                        </blockquote>
+                      )}
+                      <p className="text-[13px] font-bold leading-relaxed">{note.prompt}</p>
+                      <p className="whitespace-pre-wrap text-[13px] leading-relaxed opacity-90">
+                        {note.answer}
+                      </p>
+                      <p className="eyebrow text-current opacity-60">
+                        {t.report.coach.model} · {note.model}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

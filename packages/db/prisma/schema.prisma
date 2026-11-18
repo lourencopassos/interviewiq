@@ -26,8 +26,10 @@ model Session {
   closing        String?        @db.Text
   videoMode      Boolean        @default(false)
   avatarImageUrl String?
+  coachEnabled   Boolean        @default(true)
   questions      Question[]
   report         Report?
+  coachNotes     CoachNote[]
 
   @@index([clientId])
 }
@@ -47,8 +49,30 @@ model Question {
   feedback   String? @db.Text
   strengths  String? @db.Text
   gaps       String? @db.Text
+  coachNotes CoachNote[]
 
   @@index([sessionId])
+}
+
+/// A mid-interview "explain this" exchange with the coach model.
+model CoachNote {
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now())
+  sessionId         String
+  session           Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId        String?
+  question          Question? @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  /// "question" | "transcript" | "free"
+  source            String
+  selection         String?   @db.Text
+  prompt            String    @db.Text
+  answer            String    @db.Text
+  /// True when the candidate asked before answering the question (shown as "coached" in the report)
+  askedBeforeAnswer Boolean   @default(false)
+  model             String
+
+  @@index([sessionId])
+  @@index([questionId])
 }
 
 model Report {
