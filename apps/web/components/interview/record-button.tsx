@@ -2,6 +2,7 @@
 
 import { Mic, Square, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * What the interview is doing right now, from the recorder's point of view.
@@ -28,13 +29,6 @@ interface RecordButtonProps {
   disabled?: boolean;
 }
 
-const phaseLabels: Record<Exclude<RecordPhase, "recording">, string> = {
-  speaking: "Listening…",
-  processing: "Processing…",
-  ready: "Record answer",
-  idle: "Please wait…",
-};
-
 /**
  * The one big control. Ready is a sage tile that lifts and presses like the
  * accent button; recording turns blush with a pulsing ring; processing is a
@@ -58,6 +52,7 @@ export function RecordButton({
   onStop,
   disabled,
 }: RecordButtonProps) {
+  const { t } = useI18n();
   const isRecording = phase === "recording";
   const isDisabled = disabled ?? (phase !== "ready" && phase !== "recording");
 
@@ -67,6 +62,13 @@ export function RecordButton({
 
   // Ring scale based on audio level during recording
   const ringScale = isRecording ? 1 + audioLevel * 0.3 : 1;
+
+  const phaseLabels: Record<Exclude<RecordPhase, "recording">, string> = {
+    speaking: t.interview.record.speaking,
+    processing: t.interview.record.processing,
+    ready: t.interview.record.ready,
+    idle: t.interview.record.idle,
+  };
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -87,7 +89,7 @@ export function RecordButton({
           type="button"
           onClick={isRecording ? onStop : onStart}
           disabled={isDisabled}
-          aria-label={isRecording ? "Stop recording" : "Record answer"}
+          aria-label={isRecording ? t.interview.record.stop : t.interview.record.start}
           className={cn(
             "relative z-10 flex h-20 w-20 min-h-[80px] min-w-[80px] items-center justify-center rounded-full border-1.5 border-ink",
             "transition-[transform,box-shadow,background-color,color] duration-150 ease-pop",
@@ -111,7 +113,7 @@ export function RecordButton({
         {isRecording ? (
           <span className="flex items-center gap-2">
             <span className="led led-live bg-rust text-rust/40" aria-hidden />
-            Recording <span className="tabular-nums">{timeStr}</span>
+            {t.interview.record.recording} <span className="tabular-nums">{timeStr}</span>
           </span>
         ) : (
           phaseLabels[phase]

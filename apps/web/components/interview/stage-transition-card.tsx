@@ -2,11 +2,31 @@
 
 import { Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n, type Dictionary } from "@/lib/i18n";
 
 interface StageTransitionCardProps {
   completedStage: string;
   stageScore: number;
   nextStage: string;
+}
+
+type StageKey = keyof Dictionary["interview"]["stages"];
+
+/**
+ * The server emits Full Loop stage names as the English labels from
+ * `FULL_LOOP_STAGES` (packages/types). Map them back to the enum so the UI can
+ * show them in the interface language; unknown labels pass through unchanged.
+ */
+const stageKeyByLabel: Record<string, StageKey> = {
+  "Phone Screen": "PHONE_SCREEN",
+  "Technical Deep Dive": "TECHNICAL",
+  Behavioral: "BEHAVIORAL",
+  "System Design": "SYSTEM_DESIGN",
+};
+
+export function localizeStage(label: string, t: Dictionary): string {
+  const key = stageKeyByLabel[label] ?? (label as StageKey);
+  return t.interview.stages[key] ?? label;
 }
 
 function scoreTone(score: number): string {
@@ -21,14 +41,16 @@ export function StageTransitionCard({
   stageScore,
   nextStage,
 }: StageTransitionCardProps) {
+  const { t } = useI18n();
+
   return (
     <section className="tile animate-pop-in bg-lavender p-5 sm:p-6" aria-live="polite">
       {completedStage && (
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">
-            <p className="eyebrow text-lavender-deep">Stage complete</p>
+            <p className="eyebrow text-lavender-deep">{t.interview.stageTransition.complete}</p>
             <p className="mt-1 truncate text-[17px] font-extrabold tracking-tight text-lavender-deep">
-              {completedStage}
+              {localizeStage(completedStage, t)}
             </p>
           </div>
           <div
@@ -45,13 +67,13 @@ export function StageTransitionCard({
 
       <div className="my-4 flex items-center gap-3">
         <span className="h-0 flex-1 border-t-1.5 border-dashed border-line-strong" aria-hidden />
-        <span className="eyebrow text-lavender-deep">Up next</span>
+        <span className="eyebrow text-lavender-deep">{t.interview.stageTransition.upNext}</span>
         <span className="h-0 flex-1 border-t-1.5 border-dashed border-line-strong" aria-hidden />
       </div>
 
       <div className="flex items-center justify-center gap-2 text-[15px] font-extrabold tracking-tight text-lavender-deep">
         <Layers className="h-4 w-4" />
-        {nextStage}
+        {localizeStage(nextStage, t)}
       </div>
     </section>
   );

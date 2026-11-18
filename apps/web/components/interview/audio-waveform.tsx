@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { interpolate, useI18n } from "@/lib/i18n";
 
 interface AudioWaveformProps {
   isActive: boolean;
@@ -16,15 +17,21 @@ const BAR_COUNT = 28;
  * The mic level nudges the bar heights so the wave reacts to the voice.
  */
 export function AudioWaveform({ isActive, audioLevel, variant }: AudioWaveformProps) {
+  const { t } = useI18n();
   const barColor = variant === "recording" ? "bg-sky-deep" : "bg-peach-deep";
-  const label = variant === "recording" ? "listening" : "interviewer";
+  const label =
+    variant === "recording" ? t.interview.waveform.listening : t.interview.waveform.interviewer;
   const level = Math.min(1, Math.max(0, audioLevel));
 
   return (
     <div
       className="flex h-16 items-center justify-center gap-[3px]"
       role="img"
-      aria-label={isActive ? `Audio active: ${label}` : "Audio idle"}
+      aria-label={
+        isActive
+          ? interpolate(t.interview.waveform.active, { label })
+          : t.interview.waveform.idle
+      }
     >
       {Array.from({ length: BAR_COUNT }).map((_, i) => {
         // 0 at the centre, ~1 at the edges — the wave is tallest in the middle

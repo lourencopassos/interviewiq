@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import { getClientId } from "@/lib/client-id";
+import { interpolate, useI18n } from "@/lib/i18n";
 import { SessionCard } from "@/components/history/session-card";
 import { SessionFilters } from "@/components/history/session-filters";
 import { EmptyState } from "@/components/history/empty-state";
@@ -22,6 +23,7 @@ interface SessionItem {
 }
 
 export default function HistoryPage() {
+  const { t } = useI18n();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState("all");
@@ -47,39 +49,43 @@ export default function HistoryPage() {
     fetchSessions();
   }, [fetchSessions]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    const clientId = getClientId();
-    let res: Response;
-    try {
-      res = await fetch(
-        `/api/sessions/${id}?clientId=${encodeURIComponent(clientId)}`,
-        { method: "DELETE" },
-      );
-    } catch (error) {
-      console.error("Failed to delete session:", error);
-      throw new Error("Network error — could not delete session");
-    }
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      const message =
-        res.status === 403
-          ? "You can only delete your own sessions"
-          : res.status === 404
-            ? "Session no longer exists"
-            : typeof data?.error === "string"
-              ? data.error
-              : `Failed to delete session (${res.status})`;
-      if (res.status === 404) {
-        // Already gone — drop it from the list rather than erroring
-        setSessions((prev) => prev.filter((s) => s.id !== id));
-        return;
+  const deleteErrors = t.history.deleteErrors;
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const clientId = getClientId();
+      let res: Response;
+      try {
+        res = await fetch(
+          `/api/sessions/${id}?clientId=${encodeURIComponent(clientId)}`,
+          { method: "DELETE" },
+        );
+      } catch (error) {
+        console.error("Failed to delete session:", error);
+        throw new Error(deleteErrors.network);
       }
-      throw new Error(message);
-    }
 
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const message =
+          res.status === 403
+            ? deleteErrors.forbidden
+            : res.status === 404
+              ? deleteErrors.gone
+              : typeof data?.error === "string"
+                ? data.error
+                : interpolate(deleteErrors.status, { status: res.status });
+        if (res.status === 404) {
+          // Already gone — drop it from the list rather than erroring
+          setSessions((prev) => prev.filter((s) => s.id !== id));
+          return;
+        }
+        throw new Error(message);
+      }
+
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    },
+    [deleteErrors],
+  );
 
   const clearFilters = useCallback(() => {
     setDifficulty("all");
@@ -100,20 +106,22 @@ export default function HistoryPage() {
         <div>
           <p className="eyebrow flex items-center gap-2">
             <span>
-              <span className="text-ink">[ history ]</span> every session on this machine
+              <span className="text-ink">[ {t.history.eyebrow} ]</span> {t.history.tagline}
             </span>
             {!loading && (
               <span className="pill bg-card tabular-nums normal-case tracking-normal">
-                {hasActiveFilters ? `${filtered.length} of ${sessions.length}` : sessions.length}
+                {hasActiveFilters
+                  ? interpolate(t.history.countFiltered, { n: filtered.length, total: sessions.length })
+                  : interpolate(t.history.count, { n: sessions.length })}
               </span>
             )}
           </p>
-          <h1 className="mt-2 text-2xl sm:text-3xl">Past sessions</h1>
+          <h1 className="mt-2 text-2xl sm:text-3xl">{t.history.title}</h1>
         </div>
         <Button asChild variant="accent" className="shrink-0">
           <Link href="/new">
             <Plus className="h-4 w-4" />
-            New interview
+            {t.history.newInterview}
           </Link>
         </Button>
       </header>

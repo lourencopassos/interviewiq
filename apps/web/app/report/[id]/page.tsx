@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { CoachingReport } from "@interviewiq/types";
+import { interpolate, LOCALE_TAGS, useI18n, type Dictionary } from "@/lib/i18n";
 import { VerdictBanner } from "@/components/report/verdict-banner";
 import { DimensionScores } from "@/components/report/dimension-scores";
 import { StrengthsImprovements } from "@/components/report/strengths-improvements";
@@ -45,14 +46,37 @@ interface ReportData {
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 40;
 
+/**
+ * Error copy is stored as a descriptor and resolved against the dictionary at
+ * render time, so the fetch logic stays locale-agnostic and messages follow a
+ * locale switch.
+ */
+type ErrorMessage =
+  | { key: "network" | "timeout" | "failed" | "regenerateNetwork" | "regenerateFailed" }
+  | { key: "loadStatus" | "regenerateStatus"; status: number }
+  | { key: "custom"; text: string };
+
+function resolveError(t: Dictionary, message: ErrorMessage): string {
+  const copy = t.report.fetchErrors;
+  switch (message.key) {
+    case "custom":
+      return message.text;
+    case "loadStatus":
+    case "regenerateStatus":
+      return interpolate(copy[message.key], { status: message.status });
+    default:
+      return copy[message.key];
+  }
+}
+
 type ViewState =
   | { kind: "loading"; attempt: number; sessionStatus: string | null }
   | { kind: "ready"; data: ReportData }
   | { kind: "not_found" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: ErrorMessage };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+function formatDate(iso: string, localeTag: string): string {
+  return new Date(iso).toLocaleDateString(localeTag, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -61,13 +85,15 @@ function formatDate(iso: string): string {
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
+  const { t, locale } = useI18n();
+  const localeTag = LOCALE_TAGS[locale];
   const [view, setView] = useState<ViewState>({
     kind: "loading",
     attempt: 0,
     sessionStatus: null,
   });
   const [regenerating, setRegenerating] = useState(false);
-  const [regenerateError, setRegenerateError] = useState<string | null>(null);
+  const [regenerateError, setRegenerateError] = useState<ErrorMessage | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -83,10 +109,7 @@ export default function ReportPage() {
         res = await fetch(`/api/sessions/${id}/report`);
       } catch {
         if (!cancelled) {
-          setView({
-            kind: "error",
-            message: "Network error — could not load the report",
-          });
+          setView({ kind: "error", message: { key: "network" } });
         }
         return;
       }
@@ -109,11 +132,7 @@ export default function ReportPage() {
         };
         if (cancelled) return;
         if (attempt >= MAX_POLL_ATTEMPTS) {
-          setView({
-            kind: "error",
-            message:
-              "The report is taking longer than expected. You can try generating it again.",
-          });
+          setView({ kind: "error", message: { key: "timeout" } });
           return;
         }
         setView({
@@ -134,10 +153,10 @@ export default function ReportPage() {
         kind: "error",
         message:
           body.code === "FAILED"
-            ? "Report generation failed."
+            ? { key: "failed" }
             : typeof body.error === "string"
-              ? body.error
-              : `Failed to load report (${res.status})`,
+              ? { key: "custom", text: body.error }
+              : { key: "loadStatus", status: res.status },
       });
     }
 
@@ -160,20 +179,21 @@ export default function ReportPage() {
       const res = await fetch(`/api/sessions/${id}/report`, { method: "POST" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(
+        setRegenerateError(
           typeof json?.error === "string"
-            ? json.error
-            : `Regeneration failed (${res.status})`,
+            ? { key: "custom", text: json.error }
+            : { key: "regenerateStatus", status: res.status },
         );
+        return;
       }
       setView({ kind: "ready", data: json as ReportData });
     } catch (err) {
       setRegenerateError(
         err instanceof TypeError
-          ? "Network error — please try again"
+          ? { key: "regenerateNetwork" }
           : err instanceof Error
-            ? err.message
-            : "Regeneration failed",
+            ? { key: "custom", text: err.message }
+            : { key: "regenerateFailed" },
       );
     } finally {
       setRegenerating(false);
@@ -183,10 +203,10 @@ export default function ReportPage() {
   if (view.kind === "loading") {
     const statusCopy =
       view.sessionStatus === "WRAPPING_UP"
-        ? "Writing your coaching report. This takes about a minute."
+        ? t.report.loading.wrappingUp
         : view.sessionStatus === "INTERVIEWING"
-          ? "The interview is still running. The report appears once it ends."
-          : "Waiting for the report.";
+          ? t.report.loading.interviewing
+          : t.report.loading.waiting;
 
     return (
       <div className="container max-w-4xl space-y-6 py-10" aria-busy="true">
@@ -214,7 +234,7 @@ export default function ReportPage() {
             <span className="led led-live bg-current" aria-hidden />
             <p className="text-[13px]">{statusCopy}</p>
             <span className="ml-auto hidden text-[11px] tabular-nums opacity-70 sm:inline">
-              check {view.attempt}/{MAX_POLL_ATTEMPTS}
+              {interpolate(t.report.loading.check, { n: view.attempt, total: MAX_POLL_ATTEMPTS })}
             </span>
           </div>
         )}
@@ -223,20 +243,19 @@ export default function ReportPage() {
   }
 
   if (view.kind === "not_found") {
+    const copy = t.report.notFound;
     return (
       <div className="container max-w-lg py-24">
         <div className="tile-pop bg-butter p-6 text-butter-deep sm:p-8">
-          <p className="eyebrow text-current opacity-80">[ 404 ] session not found</p>
-          <h1 className="mt-2 text-2xl text-current">There&apos;s no report here.</h1>
-          <p className="mt-2 text-[13px] leading-relaxed opacity-90">
-            This session doesn&apos;t exist or was deleted.
-          </p>
+          <p className="eyebrow text-current opacity-80">{copy.eyebrow}</p>
+          <h1 className="mt-2 text-2xl text-current">{copy.title}</h1>
+          <p className="mt-2 text-[13px] leading-relaxed opacity-90">{copy.body}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild variant="outline">
-              <Link href="/history">Back to history</Link>
+              <Link href="/history">{copy.backToHistory}</Link>
             </Button>
             <Button asChild variant="ghost">
-              <Link href="/new">Start a new interview</Link>
+              <Link href="/new">{copy.startNew}</Link>
             </Button>
           </div>
         </div>
@@ -245,19 +264,18 @@ export default function ReportPage() {
   }
 
   if (view.kind === "error") {
+    const copy = t.report.errorState;
     return (
       <div className="container max-w-lg py-24">
         <div className="tile-pop bg-blush p-6 text-blush-deep sm:p-8">
-          <p className="eyebrow text-current opacity-80">[ report ] couldn&apos;t load</p>
-          <h1 className="mt-2 text-2xl text-current">{view.message}</h1>
-          <p className="mt-2 text-[13px] leading-relaxed opacity-90">
-            Regenerating rebuilds the report from the recorded answers.
-          </p>
+          <p className="eyebrow text-current opacity-80">{copy.eyebrow}</p>
+          <h1 className="mt-2 text-2xl text-current">{resolveError(t, view.message)}</h1>
+          <p className="mt-2 text-[13px] leading-relaxed opacity-90">{copy.body}</p>
 
           {regenerateError && (
             <Alert variant="destructive" className="mt-4 bg-card">
-              <AlertTitle>Regenerate failed</AlertTitle>
-              <AlertDescription>{regenerateError}</AlertDescription>
+              <AlertTitle>{copy.regenerateFailedTitle}</AlertTitle>
+              <AlertDescription>{resolveError(t, regenerateError)}</AlertDescription>
             </Alert>
           )}
 
@@ -268,10 +286,10 @@ export default function ReportPage() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              {regenerating ? "Regenerating…" : "Regenerate report"}
+              {regenerating ? copy.regenerating : copy.regenerate}
             </Button>
             <Button asChild variant="outline">
-              <Link href="/history">Back to history</Link>
+              <Link href="/history">{copy.backToHistory}</Link>
             </Button>
           </div>
         </div>
@@ -281,22 +299,36 @@ export default function ReportPage() {
 
   const { report, session, questions } = view.data;
 
+  // The title strip reads lowercase by design; the shared labels are sentence case.
+  const difficultyLabel = (
+    (t.common.difficulty as Record<string, string>)[session.difficulty] ?? session.difficulty
+  ).toLocaleLowerCase(localeTag);
+  const typeLabel = (
+    (t.common.interviewType as Record<string, string>)[session.interviewType] ??
+    session.interviewType.replace(/_/g, " ")
+  ).toLocaleLowerCase(localeTag);
+  const languageLabel =
+    (t.common.interviewLanguage as Record<string, string>)[session.language] ??
+    session.language.replace(/_/g, "-");
+
   return (
     <div className="container max-w-4xl space-y-8 py-10">
       {/* Title strip */}
       <header className="flex flex-col gap-3 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="eyebrow">
-            <span className="text-ink">[ report ]</span> {session.companyName} ·{" "}
-            {session.difficulty.toLowerCase()} · {session.interviewType.replace(/_/g, " ").toLowerCase()}
+            <span className="text-ink">[ {t.report.eyebrow} ]</span> {session.companyName} ·{" "}
+            {difficultyLabel} · {typeLabel}
           </p>
           <h1 className="mt-2 text-balance text-2xl sm:text-3xl">{session.jobTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {session.createdAt ? (
-            <span className="pill bg-card tabular-nums">{formatDate(session.createdAt)}</span>
+            <span className="pill bg-card tabular-nums">
+              {formatDate(session.createdAt, localeTag)}
+            </span>
           ) : (
-            <span className="pill bg-card">{session.language.replace(/_/g, "-")}</span>
+            <span className="pill bg-card">{languageLabel}</span>
           )}
         </div>
       </header>
@@ -312,16 +344,23 @@ export default function ReportPage() {
 
       {/* Summary + culture fit */}
       <div className={report.companyCultureFit ? "grid gap-4 md:grid-cols-[1.4fr_1fr]" : ""}>
-        <section aria-label="Summary" className="tile p-5">
+        <section aria-label={t.report.summary.sectionLabel} className="tile p-5">
           <p className="eyebrow">
-            <span className="text-ink">[ summary ]</span> the short version
+            <span className="text-ink">[ {t.report.summary.eyebrow} ]</span>{" "}
+            {t.report.summary.tagline}
           </p>
           <p className="mt-2 text-[13.5px] leading-relaxed text-ink-2">{report.executiveSummary}</p>
         </section>
 
         {report.companyCultureFit && (
-          <section aria-label="Culture fit" className="tile bg-sky p-5 text-sky-deep">
-            <p className="eyebrow text-current opacity-80">[ culture fit ] at {session.companyName}</p>
+          <section
+            aria-label={t.report.cultureFit.sectionLabel}
+            className="tile bg-sky p-5 text-sky-deep"
+          >
+            <p className="eyebrow text-current opacity-80">
+              [ {t.report.cultureFit.eyebrow} ]{" "}
+              {interpolate(t.report.cultureFit.at, { company: session.companyName })}
+            </p>
             <p className="mt-2 text-[13px] leading-relaxed">{report.companyCultureFit}</p>
           </section>
         )}
@@ -345,11 +384,11 @@ export default function ReportPage() {
       {/* Retake readiness */}
       {report.estimatedRetakeReadiness > 0 && (
         <p className="flex flex-wrap items-center justify-center gap-2 text-[12px] text-muted-foreground">
-          <span className="eyebrow">retake readiness</span>
+          <span className="eyebrow">{t.report.retake.eyebrow}</span>
           <span className="pill bg-card tabular-nums text-ink">
-            {report.estimatedRetakeReadiness} days
+            {interpolate(t.report.retake.days, { n: report.estimatedRetakeReadiness })}
           </span>
-          of focused study before the next attempt
+          {t.report.retake.tail}
         </p>
       )}
 

@@ -1,19 +1,22 @@
 "use client";
 
 import { Lightbulb } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface NextTipsPanelProps {
   tips: string[];
 }
 
 export function NextTipsPanel({ tips }: NextTipsPanelProps) {
+  const { t } = useI18n();
+  const copy = t.report.nextTips;
   if (tips.length === 0) return null;
 
   return (
-    <section aria-label="Tips for your next interview" className="tile-pop bg-butter p-5 text-butter-deep">
+    <section aria-label={copy.sectionLabel} className="tile-pop bg-butter p-5 text-butter-deep">
       <div className="flex items-center justify-between gap-3">
         <p className="eyebrow text-current opacity-80">
-          <span className="text-current opacity-100">[ next time ]</span> walk in with these
+          <span className="text-current opacity-100">[ {copy.eyebrow} ]</span> {copy.tagline}
         </p>
         <Lightbulb className="h-4 w-4 shrink-0" />
       </div>

@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Printer, RotateCcw, History } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface ReportActionsProps {
   sessionId: string;
 }
 
 export function ReportActions({ sessionId }: ReportActionsProps) {
+  const { t } = useI18n();
+  const copy = t.report.actions;
+
   return (
     <div
       data-session-id={sessionId}
@@ -17,19 +21,19 @@ export function ReportActions({ sessionId }: ReportActionsProps) {
       <Button asChild variant="accent">
         <Link href="/new">
           <RotateCcw className="h-4 w-4" />
-          Practice again
+          {copy.practiceAgain}
         </Link>
       </Button>
 
       <Button variant="outline" onClick={() => window.print()}>
         <Printer className="h-4 w-4" />
-        Export PDF
+        {copy.exportPdf}
       </Button>
 
       <Button asChild variant="ghost">
         <Link href="/history">
           <History className="h-4 w-4" />
-          History
+          {copy.history}
         </Link>
       </Button>
     </div>

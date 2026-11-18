@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { CoachingReport } from "@interviewiq/types";
+import { useI18n } from "@/lib/i18n";
 
 interface StrengthsImprovementsProps {
   strengths: CoachingReport["strengths"];
@@ -18,12 +19,16 @@ export function StrengthsImprovements({
   strengths,
   areasToImprove,
 }: StrengthsImprovementsProps) {
+  const { t } = useI18n();
+  const strengthsCopy = t.report.strengths;
+  const improveCopy = t.report.improvements;
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <section aria-label="Strengths">
+      <section aria-label={strengthsCopy.sectionLabel}>
         <div className="mb-3 flex items-center justify-between">
           <p className="eyebrow">
-            <span className="text-ink">[ strengths ]</span> what landed
+            <span className="text-ink">[ {strengthsCopy.eyebrow} ]</span> {strengthsCopy.tagline}
           </p>
           <span className="pill bg-sage text-sage-deep tabular-nums">{strengths.length}</span>
         </div>
@@ -36,16 +41,16 @@ export function StrengthsImprovements({
           ))}
           {strengths.length === 0 && (
             <div className="sheet border-dashed border-line-strong p-4 text-[12.5px] text-muted-foreground">
-              Nothing stood out as a strength this time.
+              {strengthsCopy.empty}
             </div>
           )}
         </div>
       </section>
 
-      <section aria-label="Areas to improve">
+      <section aria-label={improveCopy.sectionLabel}>
         <div className="mb-3 flex items-center justify-between">
           <p className="eyebrow">
-            <span className="text-ink">[ areas to improve ]</span> fix these first
+            <span className="text-ink">[ {improveCopy.eyebrow} ]</span> {improveCopy.tagline}
           </p>
           <span className="pill bg-butter text-butter-deep tabular-nums">{areasToImprove.length}</span>
         </div>
@@ -54,14 +59,16 @@ export function StrengthsImprovements({
             <div key={i} className="sheet p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-ink">{a.title}</p>
-                <span className={cn("pill shrink-0", priorityTone[a.priority])}>{a.priority}</span>
+                <span className={cn("pill shrink-0", priorityTone[a.priority])}>
+                  {improveCopy.priority[a.priority] ?? a.priority}
+                </span>
               </div>
               <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">{a.detail}</p>
             </div>
           ))}
           {areasToImprove.length === 0 && (
             <div className="sheet border-dashed border-line-strong p-4 text-[12.5px] text-muted-foreground">
-              No gaps worth a line. Keep doing what you did.
+              {improveCopy.empty}
             </div>
           )}
         </div>

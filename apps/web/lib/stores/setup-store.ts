@@ -10,6 +10,18 @@ import type {
 
 type SetupStep = "input" | "parsing" | "researching" | "ready" | "error";
 
+/**
+ * Error codes the store emits for its own failure modes. Server-provided
+ * messages are passed through unchanged; the rendering component maps
+ * these codes to localized copy and shows anything else verbatim.
+ */
+export const SETUP_ERROR_CODES = {
+  network: "NETWORK_ERROR",
+  parseFailed: "PARSE_FAILED",
+  unknown: "UNKNOWN_ERROR",
+} as const;
+export type SetupErrorCode = (typeof SETUP_ERROR_CODES)[keyof typeof SETUP_ERROR_CODES];
+
 interface SetupStore {
   // Input state
   jobDescription: string;
@@ -75,7 +87,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
 
       if (!parseRes.ok) {
         const err = await parseRes.json();
-        throw new Error(err.error || "Failed to parse job description");
+        throw new Error(err.error || SETUP_ERROR_CODES.parseFailed);
       }
 
       const parsedJob: ParsedJob = await parseRes.json();
@@ -104,10 +116,10 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
     } catch (error) {
       const message =
         error instanceof TypeError
-          ? "Network error — please check your connection"
+          ? SETUP_ERROR_CODES.network
           : error instanceof Error
             ? error.message
-            : "Something went wrong";
+            : SETUP_ERROR_CODES.unknown;
       set({ step: "error", error: message });
     }
   },

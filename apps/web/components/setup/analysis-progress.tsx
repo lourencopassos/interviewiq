@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import { useSetupStore } from "@/lib/stores/setup-store";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type StepStatus = "pending" | "active" | "completed";
@@ -14,6 +15,8 @@ interface LogLineProps {
 
 /** One line of the job log: index, command, and a status token on the right. */
 function LogLine({ index, label, status }: LogLineProps) {
+  const { t } = useI18n();
+
   return (
     <li
       className={cn(
@@ -43,18 +46,18 @@ function LogLine({ index, label, status }: LogLineProps) {
           key="done"
           className="pill animate-pop-in bg-sage text-sage-deep"
         >
-          <Check className="h-3 w-3" aria-hidden /> done
+          <Check className="h-3 w-3" aria-hidden /> {t.setup.analysis.done}
         </span>
       )}
       {status === "active" && (
         <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-rust">
           <span className="led led-live bg-rust text-rust/40" aria-hidden />
-          running
+          {t.setup.analysis.running}
         </span>
       )}
       {status === "pending" && (
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">
-          queued
+          {t.setup.analysis.queued}
         </span>
       )}
     </li>
@@ -62,6 +65,7 @@ function LogLine({ index, label, status }: LogLineProps) {
 }
 
 export function AnalysisProgress() {
+  const { t } = useI18n();
   const { step } = useSetupStore();
 
   if (step === "input" || step === "error") return null;
@@ -83,7 +87,7 @@ export function AnalysisProgress() {
       className="tile overflow-hidden"
       role="status"
       aria-live="polite"
-      aria-label="Analysis progress"
+      aria-label={t.setup.analysis.ariaLabel}
     >
       <div className="flex items-center justify-between border-b-1.5 border-ink bg-sheet px-4 py-2.5">
         <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-2">
@@ -94,16 +98,16 @@ export function AnalysisProgress() {
             )}
             aria-hidden
           />
-          analysis · job log
+          {t.setup.analysis.logTitle}
         </span>
         <span className={cn("pill", finished ? "bg-sage text-sage-deep" : "bg-butter text-butter-deep")}>
-          {finished ? "ready" : "working"}
+          {finished ? t.setup.analysis.ready : t.setup.analysis.working}
         </span>
       </div>
       <ol className="divide-y divide-line">
-        <LogLine index="01" label="Parse the posting" status={getStatus("parsing")} />
-        <LogLine index="02" label="Research the company" status={getStatus("researching")} />
-        <LogLine index="03" label="Ready to start" status={getStatus("ready")} />
+        <LogLine index="01" label={t.setup.analysis.steps.parse} status={getStatus("parsing")} />
+        <LogLine index="02" label={t.setup.analysis.steps.research} status={getStatus("researching")} />
+        <LogLine index="03" label={t.setup.analysis.steps.ready} status={getStatus("ready")} />
       </ol>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { Video, VideoOff } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface SelfViewProps {
   stream: MediaStream | null;
@@ -11,6 +12,7 @@ interface SelfViewProps {
 
 /** Small picture-in-picture tile of the candidate's webcam, mirrored. */
 export function SelfView({ stream, isActive, onToggle }: SelfViewProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function SelfView({ stream, isActive, onToggle }: SelfViewProps) {
           type="button"
           onClick={onToggle}
           className="absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-md border-1.5 border-ink bg-card text-ink shadow-pop-sm transition-colors hover:bg-sheet"
-          aria-label={isActive ? "Turn off camera" : "Turn on camera"}
+          aria-label={isActive ? t.interview.selfView.turnOff : t.interview.selfView.turnOn}
         >
           {isActive ? (
             <Video className="h-3 w-3" aria-hidden />

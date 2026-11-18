@@ -1,0 +1,96 @@
+import type { setup as En } from "../en/setup";
+
+export const setup: typeof En = {
+  header: {
+    eyebrowLead: "nova sessão",
+    eyebrowRest: "colar · analisar · começar",
+    title: "Configure a entrevista.",
+    body: "Cole uma vaga. O entrevistador extrai o cargo e a stack, estuda a empresa e depois faz as perguntas em voz alta.",
+  },
+  charCount: "{count} caracteres",
+  posting: {
+    label: "cole a vaga",
+    placeholder:
+      "Cole a descrição completa da vaga, requisitos e tudo. Quanto mais texto, mais afiadas as perguntas.",
+    enough: "Suficiente para analisar",
+    moreCharsOne: "Falta 1 caractere",
+    moreCharsOther: "Faltam {count} caracteres",
+    timing: "A análise e a pesquisa da empresa levam uns 40 segundos.",
+    analyze: "Analisar a vaga",
+  },
+  analysis: {
+    failedTitle: "A análise falhou",
+    ariaLabel: "Progresso da análise",
+    logTitle: "análise · registro",
+    ready: "pronto",
+    working: "em andamento",
+    done: "feito",
+    running: "rodando",
+    queued: "na fila",
+    steps: {
+      parse: "Analisar a vaga",
+      research: "Pesquisar a empresa",
+      ready: "Pronto para começar",
+    },
+    errors: {
+      network: "Erro de rede — verifique sua conexão",
+      parseFailed: "Não foi possível analisar a descrição da vaga",
+      unknown: "Algo deu errado",
+    },
+  },
+  preview: {
+    parsed: "analisado",
+    clear: "Limpar a análise e analisar de novo",
+    skills: "O que eles procuram",
+    focus: "Para onde as perguntas vão",
+    intel: "Inteligência da empresa · busca na web",
+    techStack: "Stack técnica",
+    culture: "Cultura de engenharia",
+    coachingTip: "Dica de coaching",
+  },
+  configure: {
+    eyebrow: "configurar",
+    title: "Como a sessão funciona.",
+    difficulty: "Dificuldade",
+    interviewType: "Tipo de entrevista",
+    language: "Idioma",
+    questions: "{count} perguntas",
+    typeMeta: {
+      PHONE_SCREEN: "aquecimento",
+      TECHNICAL: "aprofundamentos",
+      BEHAVIORAL: "histórias, STAR",
+      SYSTEM_DESIGN: "arquitetura",
+      FULL_LOOP: "4 etapas",
+    },
+  },
+  video: {
+    label: "Entrevista em vídeo",
+    body: "Uma chamada estilo Meet com o avatar do entrevistador e a sua webcam. Desligado, fica só o áudio.",
+    on: "Vídeo ligado",
+    off: "Vídeo desligado",
+  },
+  resume: {
+    label: "Seu currículo",
+    placeholder:
+      "Cole seu currículo como texto. As perguntas passam a se apoiar no que você já fez de verdade.",
+    hint: "Se pular, o entrevistador trabalha só com a vaga.",
+  },
+  start: {
+    ready: "pronto",
+    video: "vídeo",
+    audio: "áudio",
+    withResume: "com currículo",
+    titleAt: "{title} na {company}",
+    creating: "Criando a sessão…",
+    button: "Começar a entrevista",
+    permissionMic: "Na próxima tela, vamos pedir acesso ao microfone.",
+    permissionMicCamera: "Na próxima tela, vamos pedir acesso ao microfone e à câmera.",
+    failedTitle: "Não foi possível começar a entrevista",
+    errors: {
+      network: "Erro de rede — verifique sua conexão e tente de novo",
+      createFailed: "Não foi possível criar a sessão ({status})",
+      unknown: "Não foi possível criar a sessão",
+    },
+  },
+  startOver: "Recomeçar com outra vaga",
+};

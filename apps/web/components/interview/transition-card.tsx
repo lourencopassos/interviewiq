@@ -1,6 +1,7 @@
 "use client";
 
 import { CornerDownRight } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface TransitionCardProps {
   message: string;
@@ -10,6 +11,9 @@ interface TransitionCardProps {
 
 /** The interviewer's remark between questions: a lavender system tile. */
 export function TransitionCard({ message, score, tier }: TransitionCardProps) {
+  const { t } = useI18n();
+  const tierLabel = tier ? ((t.common.tier as Record<string, string>)[tier] ?? tier) : null;
+
   return (
     <div className="tile animate-pop-in bg-lavender p-4 sm:p-5">
       <div className="flex gap-3">
@@ -18,11 +22,11 @@ export function TransitionCard({ message, score, tier }: TransitionCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
-            <span className="eyebrow text-lavender-deep">Interviewer</span>
+            <span className="eyebrow text-lavender-deep">{t.interview.transition.interviewer}</span>
             {score !== undefined && (
               <span className="pill ml-auto border-ink/70 bg-card/70 tabular-nums text-lavender-deep">
                 {score}
-                {tier ? ` · ${tier}` : ""}
+                {tierLabel ? ` · ${tierLabel}` : ""}
               </span>
             )}
           </div>

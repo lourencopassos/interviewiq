@@ -6,10 +6,12 @@ import { Loader2, ArrowRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSetupStore } from "@/lib/stores/setup-store";
+import { useI18n, interpolate } from "@/lib/i18n";
 import { getClientId } from "@/lib/client-id";
 
 export function StartInterviewButton() {
   const router = useRouter();
+  const { t } = useI18n();
   const {
     step,
     parsedJob,
@@ -54,7 +56,7 @@ export function StartInterviewButton() {
         throw new Error(
           typeof data?.error === "string"
             ? data.error
-            : `Failed to create session (${res.status})`,
+            : interpolate(t.setup.start.errors.createFailed, { status: res.status }),
         );
       }
 
@@ -64,10 +66,10 @@ export function StartInterviewButton() {
       console.error("Failed to start interview:", err);
       setError(
         err instanceof TypeError
-          ? "Network error — please check your connection and try again"
+          ? t.setup.start.errors.network
           : err instanceof Error
             ? err.message
-            : "Failed to create session",
+            : t.setup.start.errors.unknown,
       );
       setIsCreating(false);
     }
@@ -75,11 +77,11 @@ export function StartInterviewButton() {
 
   // A one-line readback of what's about to run, in the eyebrow voice.
   const summary = [
-    difficulty,
-    interviewType.replace(/_/g, " "),
+    t.common.difficulty[difficulty],
+    t.common.interviewType[interviewType],
     language.replace(/_/g, "-"),
-    videoMode ? "video" : "audio",
-    resumeText ? "with resume" : null,
+    videoMode ? t.setup.start.video : t.setup.start.audio,
+    resumeText ? t.setup.start.withResume : null,
   ].filter(Boolean);
 
   return (
@@ -87,17 +89,20 @@ export function StartInterviewButton() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Could not start the interview</AlertTitle>
+          <AlertTitle>{t.setup.start.failedTitle}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       <div className="tile-pop bg-ink p-4 text-paper sm:p-5">
         <p className="eyebrow text-paper/60">
-          ready · {summary.join(" · ")}
+          {t.setup.start.ready} · {summary.join(" · ")}
         </p>
         <h3 className="mt-1.5 text-lg text-paper">
-          {parsedJob.jobTitle} at {parsedJob.companyName}
+          {interpolate(t.setup.start.titleAt, {
+            title: parsedJob.jobTitle,
+            company: parsedJob.companyName,
+          })}
         </h3>
         <Button
           variant="accent"
@@ -109,17 +114,17 @@ export function StartInterviewButton() {
           {isCreating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Creating the session…
+              {t.setup.start.creating}
             </>
           ) : (
             <>
-              {error ? "Try again" : "Start the interview"}
+              {error ? t.common.retry : t.setup.start.button}
               <ArrowRight className="h-4 w-4" />
             </>
           )}
         </Button>
         <p className="mt-3 text-center text-[11px] text-paper/60">
-          You&apos;ll be asked for microphone{videoMode ? " and camera" : ""} access on the next screen.
+          {videoMode ? t.setup.start.permissionMicCamera : t.setup.start.permissionMic}
         </p>
       </div>
     </div>

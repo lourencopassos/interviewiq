@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Eye, Play, RotateCcw, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LOCALE_TAGS, useI18n } from "@/lib/i18n";
 import { scoreTone, toneStyles } from "@/components/report/score-tone";
 
 interface SessionCardProps {
@@ -29,19 +30,13 @@ const difficultyTone: Record<string, string> = {
   STAFF: "bg-lavender text-lavender-deep",
 };
 
-const statusLabel: Record<string, string> = {
-  SETUP: "setting up",
-  RESEARCHING: "researching",
-  BRIEFING: "briefing",
-  INTERVIEWING: "in progress",
-  WRAPPING_UP: "wrapping up",
-  ABANDONED: "abandoned",
-};
-
 const RESUMABLE_STATUSES = new Set(["INTERVIEWING", "WRAPPING_UP"]);
 const CONFIRM_TIMEOUT_MS = 4000;
 
 export function SessionCard({ session, onDelete }: SessionCardProps) {
+  const { t, locale } = useI18n();
+  const copy = t.history.card;
+  const localeTag = LOCALE_TAGS[locale];
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -53,11 +48,26 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
     return () => clearTimeout(timeout);
   }, [confirming]);
 
-  const date = new Date(session.createdAt).toLocaleDateString("en-US", {
+  const date = new Date(session.createdAt).toLocaleDateString(localeTag, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+
+  // Pills read lowercase by design; the shared labels are sentence case.
+  const difficultyLabel = (
+    (t.common.difficulty as Record<string, string>)[session.difficulty] ?? session.difficulty
+  ).toLocaleLowerCase(localeTag);
+  const typeLabel = (
+    (t.common.interviewType as Record<string, string>)[session.interviewType] ??
+    session.interviewType.replace(/_/g, " ")
+  ).toLocaleLowerCase(localeTag);
+  const statusLabel = (
+    session.status === "RESEARCHING"
+      ? copy.researching
+      : ((t.common.status as Record<string, string>)[session.status] ??
+        session.status.replace(/_/g, " "))
+  ).toLocaleLowerCase(localeTag);
 
   const canResume = RESUMABLE_STATUSES.has(session.status);
   const unfinished = session.status !== "COMPLETED";
@@ -69,9 +79,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
       await onDelete(session.id);
       // On success the parent removes this card; nothing else to do.
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Failed to delete session",
-      );
+      setDeleteError(err instanceof Error ? err.message : t.history.deleteErrors.generic);
       setConfirming(false);
     } finally {
       setDeleting(false);
@@ -86,11 +94,9 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
           <h3 className="mt-0.5 truncate text-base">{session.jobTitle}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className={cn("pill", difficultyTone[session.difficulty] ?? "bg-card")}>
-              {session.difficulty.toLowerCase()}
+              {difficultyLabel}
             </span>
-            <span className="pill bg-card">
-              {session.interviewType.replace(/_/g, " ").toLowerCase()}
-            </span>
+            <span className="pill bg-card">{typeLabel}</span>
           </div>
         </div>
 
@@ -104,7 +110,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
             <span className="text-2xl font-extrabold leading-none tabular-nums">
               {session.report.overallScore}
             </span>
-            <span className="eyebrow mt-1 text-[9px] text-current opacity-80">/100</span>
+            <span className="eyebrow mt-1 text-[9px] text-current opacity-80">{copy.outOf}</span>
           </div>
         ) : unfinished ? (
           <span
@@ -114,7 +120,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
             )}
           >
             {canResume && <span className="led led-live bg-current" aria-hidden />}
-            {statusLabel[session.status] ?? session.status.replace(/_/g, " ").toLowerCase()}
+            {statusLabel}
           </span>
         ) : null}
       </div>
@@ -126,7 +132,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
           <Button asChild size="sm" variant="accent">
             <Link href={`/interview/${session.id}`}>
               <Play className="h-3 w-3" />
-              Resume
+              {copy.resume}
             </Link>
           </Button>
         )}
@@ -134,14 +140,14 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
           <Button asChild size="sm" variant="outline">
             <Link href={`/report/${session.id}`}>
               <Eye className="h-3 w-3" />
-              Report
+              {copy.report}
             </Link>
           </Button>
         )}
         <Button asChild size="sm" variant="ghost">
           <Link href="/new">
             <RotateCcw className="h-3 w-3" />
-            Retake
+            {copy.retake}
           </Link>
         </Button>
         {confirming ? (
@@ -152,7 +158,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
               onClick={handleConfirmDelete}
               disabled={deleting}
             >
-              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm"}
+              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : copy.confirm}
             </Button>
             <Button
               size="sm"
@@ -160,7 +166,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
               onClick={() => setConfirming(false)}
               disabled={deleting}
             >
-              Cancel
+              {t.common.cancel}
             </Button>
           </>
         ) : (
@@ -168,7 +174,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
             size="icon-sm"
             variant="ghost"
             className="text-muted-foreground hover:bg-blush hover:text-blush-deep"
-            aria-label="Delete session"
+            aria-label={copy.deleteLabel}
             onClick={() => {
               setDeleteError(null);
               setConfirming(true);

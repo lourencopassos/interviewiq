@@ -1,0 +1,35 @@
+import type { common as En } from "../en/common";
+
+export const common: typeof En = {
+  appName: "InterviewIQ",
+  loading: "Carregando…",
+  retry: "Tentar de novo",
+  cancel: "Cancelar",
+  close: "Fechar",
+  back: "Voltar",
+  dismiss: "Fechar",
+  optional: "opcional",
+  theme: { toLight: "Mudar para o tema claro", toDark: "Mudar para o tema escuro" },
+  language: { label: "Idioma da interface" },
+  difficulty: { JUNIOR: "Júnior", MID: "Pleno", SENIOR: "Sênior", STAFF: "Staff" },
+  interviewType: {
+    PHONE_SCREEN: "Triagem por telefone",
+    TECHNICAL: "Técnica",
+    BEHAVIORAL: "Comportamental",
+    SYSTEM_DESIGN: "System design",
+    FULL_LOOP: "Ciclo completo",
+  },
+  interviewLanguage: { EN: "English", PT_BR: "Português", ES: "Español" },
+  status: {
+    SETUP: "Não iniciada",
+    BRIEFING: "Preparando",
+    INTERVIEWING: "Em andamento",
+    WRAPPING_UP: "Finalizando",
+    COMPLETED: "Concluída",
+    ABANDONED: "Abandonada",
+  },
+  tier: { poor: "falta profundidade", good: "boa", excellent: "excelente" },
+  score: "Nota",
+  question: "Pergunta",
+  mock: { on: "Mock ligado", off: "Mock desligado", titleOn: "Modo mock ligado: sem chamadas pagas de API", titleOff: "Modo mock desligado: chamadas reais de API" },
+};

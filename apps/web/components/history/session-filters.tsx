@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n";
 
 interface SessionFiltersProps {
   difficulty: string;
@@ -28,41 +29,44 @@ export function SessionFilters({
   hasActiveFilters = false,
   onClearFilters,
 }: SessionFiltersProps) {
+  const { t } = useI18n();
+  const copy = t.history.filters;
+
   return (
     <div className="sheet flex flex-wrap items-center gap-3 p-3">
-      <span className="eyebrow hidden pl-1 sm:inline">filter</span>
+      <span className="eyebrow hidden pl-1 sm:inline">{copy.label}</span>
 
       <Select value={difficulty} onValueChange={onDifficultyChange}>
-        <SelectTrigger className="w-[150px]" aria-label="Difficulty">
-          <SelectValue placeholder="Difficulty" />
+        <SelectTrigger className="w-[150px]" aria-label={copy.difficulty}>
+          <SelectValue placeholder={copy.difficulty} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All levels</SelectItem>
-          <SelectItem value="JUNIOR">Junior</SelectItem>
-          <SelectItem value="MID">Mid</SelectItem>
-          <SelectItem value="SENIOR">Senior</SelectItem>
-          <SelectItem value="STAFF">Staff</SelectItem>
+          <SelectItem value="all">{copy.allLevels}</SelectItem>
+          <SelectItem value="JUNIOR">{t.common.difficulty.JUNIOR}</SelectItem>
+          <SelectItem value="MID">{t.common.difficulty.MID}</SelectItem>
+          <SelectItem value="SENIOR">{t.common.difficulty.SENIOR}</SelectItem>
+          <SelectItem value="STAFF">{t.common.difficulty.STAFF}</SelectItem>
         </SelectContent>
       </Select>
 
       <Select value={interviewType} onValueChange={onInterviewTypeChange}>
-        <SelectTrigger className="w-[180px]" aria-label="Interview type">
-          <SelectValue placeholder="Interview type" />
+        <SelectTrigger className="w-[180px]" aria-label={copy.interviewType}>
+          <SelectValue placeholder={copy.interviewType} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All types</SelectItem>
-          <SelectItem value="PHONE_SCREEN">Phone screen</SelectItem>
-          <SelectItem value="TECHNICAL">Technical</SelectItem>
-          <SelectItem value="BEHAVIORAL">Behavioral</SelectItem>
-          <SelectItem value="SYSTEM_DESIGN">System design</SelectItem>
-          <SelectItem value="FULL_LOOP">Full loop</SelectItem>
+          <SelectItem value="all">{copy.allTypes}</SelectItem>
+          <SelectItem value="PHONE_SCREEN">{t.common.interviewType.PHONE_SCREEN}</SelectItem>
+          <SelectItem value="TECHNICAL">{t.common.interviewType.TECHNICAL}</SelectItem>
+          <SelectItem value="BEHAVIORAL">{t.common.interviewType.BEHAVIORAL}</SelectItem>
+          <SelectItem value="SYSTEM_DESIGN">{t.common.interviewType.SYSTEM_DESIGN}</SelectItem>
+          <SelectItem value="FULL_LOOP">{t.common.interviewType.FULL_LOOP}</SelectItem>
         </SelectContent>
       </Select>
 
       {hasActiveFilters && onClearFilters && (
         <Button variant="ghost" size="sm" onClick={onClearFilters} className="ml-auto">
           <FilterX className="h-3.5 w-3.5" />
-          Clear filters
+          {copy.clear}
         </Button>
       )}
     </div>

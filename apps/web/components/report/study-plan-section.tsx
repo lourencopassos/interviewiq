@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StudyPlanItem } from "@interviewiq/types";
+import { interpolate, useI18n } from "@/lib/i18n";
 
 interface StudyPlanSectionProps {
   studyPlan: StudyPlanItem[];
@@ -17,6 +18,8 @@ const resourceTone: Record<StudyPlanItem["resources"][number]["type"], string> =
 };
 
 function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) {
+  const { t } = useI18n();
+  const copy = t.report.studyPlan;
   const [isOpen, setIsOpen] = useState(false);
   const panelId = `study-plan-${index}`;
 
@@ -36,7 +39,9 @@ function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) 
           <span className="truncate font-semibold text-ink">{item.topic}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="pill bg-card tabular-nums">{item.estimatedHours}h</span>
+          <span className="pill bg-card tabular-nums">
+            {interpolate(copy.hours, { n: item.estimatedHours })}
+          </span>
           <ChevronDown
             className={cn(
               "h-4 w-4 text-muted-foreground transition-transform duration-200",
@@ -56,13 +61,13 @@ function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) 
         <div className="overflow-hidden">
           <div className="space-y-4 border-t border-line p-4">
             <div>
-              <p className="eyebrow">why it matters</p>
+              <p className="eyebrow">{copy.whyItMatters}</p>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{item.whyItMatters}</p>
             </div>
 
             {item.resources.length > 0 && (
               <div>
-                <p className="eyebrow mb-2">resources</p>
+                <p className="eyebrow mb-2">{copy.resources}</p>
                 <div className="flex flex-wrap gap-2">
                   {item.resources.map((r, i) => {
                     const pillClass = cn(
@@ -73,7 +78,9 @@ function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) 
                     const body = (
                       <>
                         <span className={cn("rounded-[4px] px-1 py-px", resourceTone[r.type])}>
-                          <span className="eyebrow text-[9px] text-current">{r.type}</span>
+                          <span className="eyebrow text-[9px] text-current">
+                            {copy.resourceType[r.type] ?? r.type}
+                          </span>
                         </span>
                         <span className="text-ink">{r.title}</span>
                         {r.url && <ExternalLink className="h-3 w-3 text-muted-foreground" />}
@@ -100,7 +107,7 @@ function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) 
             )}
 
             <div className="rounded-md border-1.5 border-ink bg-lavender p-3 text-lavender-deep">
-              <p className="eyebrow text-current opacity-80">practice prompt</p>
+              <p className="eyebrow text-current opacity-80">{copy.practicePrompt}</p>
               <p className="mt-1 text-[13px] leading-relaxed">&ldquo;{item.practicePrompt}&rdquo;</p>
             </div>
           </div>
@@ -111,17 +118,21 @@ function StudyPlanCard({ item, index }: { item: StudyPlanItem; index: number }) 
 }
 
 export function StudyPlanSection({ studyPlan }: StudyPlanSectionProps) {
+  const { t } = useI18n();
+  const copy = t.report.studyPlan;
   if (studyPlan.length === 0) return null;
 
   const totalHours = studyPlan.reduce((sum, item) => sum + item.estimatedHours, 0);
 
   return (
-    <section aria-label="Study plan">
+    <section aria-label={copy.sectionLabel}>
       <div className="mb-3 flex items-center justify-between">
         <p className="eyebrow">
-          <span className="text-ink">[ study plan ]</span> ordered by what moves your score most
+          <span className="text-ink">[ {copy.eyebrow} ]</span> {copy.tagline}
         </p>
-        <span className="pill bg-lavender text-lavender-deep tabular-nums">{totalHours}h total</span>
+        <span className="pill bg-lavender text-lavender-deep tabular-nums">
+          {interpolate(copy.totalHours, { n: totalHours })}
+        </span>
       </div>
       <div className="space-y-3">
         {studyPlan.map((item, i) => (

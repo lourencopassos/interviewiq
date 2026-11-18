@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 type AvatarPhase =
   | "speaking"
@@ -20,14 +21,6 @@ interface AvatarPanelProps {
   isMockMode: boolean;
 }
 
-const phaseLabels: Record<AvatarPhase, string> = {
-  speaking: "Speaking…",
-  listening: "Listening",
-  thinking: "Processing…",
-  loading: "Connecting avatar…",
-  fallback: "Audio mode",
-};
-
 export function AvatarPanel({
   remoteStream,
   isStreamConnected,
@@ -35,6 +28,7 @@ export function AvatarPanel({
   phase,
   isMockMode,
 }: AvatarPanelProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Attach remote stream to video element
@@ -50,6 +44,14 @@ export function AvatarPanel({
 
   const showLiveAvatar = isStreamConnected && remoteStream && !isMockMode;
   const isSpeaking = phase === "speaking" || isPlaying;
+
+  const phaseLabels: Record<AvatarPhase, string> = {
+    speaking: t.interview.avatar.speaking,
+    listening: t.interview.avatar.listening,
+    thinking: t.interview.avatar.thinking,
+    loading: t.interview.avatar.loading,
+    fallback: t.interview.avatar.fallback,
+  };
 
   return (
     <div className="tile relative aspect-video w-full overflow-hidden bg-sheet">
@@ -92,7 +94,7 @@ export function AvatarPanel({
         <div className="absolute bottom-3 right-3">
           <span className="pill bg-peach text-peach-deep">
             <span className="led led-live bg-peach-deep text-peach-deep/40" aria-hidden />
-            AI Interviewer
+            {t.interview.avatar.interviewer}
           </span>
         </div>
       )}

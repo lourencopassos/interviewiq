@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 const STORAGE_KEY = "interviewiq-theme";
 
@@ -13,6 +14,7 @@ function applyTheme(dark: boolean) {
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -34,8 +36,8 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={toggle}
-      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-      title={dark ? "Light theme" : "Dark theme"}
+      aria-label={dark ? t.common.theme.toLight : t.common.theme.toDark}
+      title={dark ? t.common.theme.toLight : t.common.theme.toDark}
       className={`tile-pop tile-pop-hover tile-pop-press inline-flex h-9 w-9 items-center justify-center rounded-md shadow-pop-sm ${className}`}
     >
       {mounted && dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
