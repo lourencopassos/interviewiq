@@ -5,8 +5,10 @@ import {
   type CompanyIntelligence,
   type Difficulty,
   type InterviewType,
+  type Language,
 } from "@interviewiq/types";
 import { callClaude } from "../client";
+import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
 
 const QUESTION_COUNT: Record<Difficulty, number> = {
@@ -26,6 +28,7 @@ function buildSystemPrompt(params: {
   resumeText?: string | null;
   /** Override the difficulty-based count (used per stage in Full Loop mode). */
   questionCount?: number;
+  language?: Language;
 }): string {
   const { companyName, jobTitle, difficulty, interviewType, parsedJob, companyIntel, resumeText } = params;
   const questionCount = params.questionCount ?? QUESTION_COUNT[difficulty];
@@ -86,6 +89,7 @@ Use the candidate's background to personalize questions:
 - At least 2 questions should directly reference their experience
 - Adjust question framing to acknowledge their seniority and domain expertise
 ` : ""}
+${languageInstruction(params.language)}
 Return ONLY valid JSON.`;
 }
 
@@ -98,6 +102,7 @@ export async function generateQuestionSet(params: {
   companyIntel: CompanyIntelligence | null;
   resumeText?: string | null;
   questionCount?: number;
+  language?: Language;
 }): Promise<QuestionSet> {
   const systemPrompt = buildSystemPrompt(params);
   const userMessage = `Generate interview questions for a ${params.difficulty} ${params.jobTitle} at ${params.companyName}. Interview type: ${params.interviewType}.`;

@@ -9,6 +9,7 @@ import {
   type CoachingReport,
   type Difficulty,
   type InterviewType,
+  type Language,
   type InterviewEvent,
   type InterviewStage,
 } from "@interviewiq/types";
@@ -467,6 +468,7 @@ export class InterviewOrchestrator {
       parsedJob,
       companyIntel,
       resumeText: session.resumeText,
+      language: session.language as Language,
     });
 
     await prisma.question.createMany({
@@ -498,6 +500,7 @@ export class InterviewOrchestrator {
           parsedJob,
           companyIntel,
           resumeText: session.resumeText,
+      language: session.language as Language,
           questionCount: stageConfig.questionCount[1],
         }),
       ),
@@ -676,6 +679,7 @@ export class InterviewOrchestrator {
       scoringGuide: current.scoringGuide,
       transcript,
       resumeText: session.resumeText,
+      language: session.language as Language,
     });
     this.emit({
       type: "evaluation_complete",
@@ -788,6 +792,7 @@ export class InterviewOrchestrator {
       completedStageLabel: completedLabel,
       completedStageScore: stageScore,
       nextStageLabel: nextLabel,
+      language: session.language as Language,
     });
 
     const transitionAudioUrl = await ttsCache.getOrGenerate(
@@ -900,6 +905,7 @@ export class InterviewOrchestrator {
         interviewType: session.interviewType as InterviewType,
         questionsWithAnswers,
         resumeText: session.resumeText,
+      language: session.language as Language,
       });
 
       const data = {

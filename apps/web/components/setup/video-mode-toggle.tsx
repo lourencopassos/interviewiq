@@ -2,6 +2,7 @@
 
 import { Video } from "lucide-react";
 import { useSetupStore } from "@/lib/stores/setup-store";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface VideoModeToggleProps {
@@ -9,6 +10,7 @@ interface VideoModeToggleProps {
 }
 
 export function VideoModeToggle({ disabled }: VideoModeToggleProps) {
+  const { t } = useI18n();
   const videoMode = useSetupStore((s) => s.videoMode);
   const setVideoMode = useSetupStore((s) => s.setVideoMode);
 
@@ -29,10 +31,10 @@ export function VideoModeToggle({ disabled }: VideoModeToggleProps) {
           htmlFor="video-mode"
           className="block cursor-pointer text-[13px] font-semibold text-ink"
         >
-          Video interview
+          {t.setup.video.label}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          A Meet-style call with an interviewer avatar and your webcam. Off means audio only.
+          {t.setup.video.body}
         </p>
       </div>
 
@@ -50,7 +52,7 @@ export function VideoModeToggle({ disabled }: VideoModeToggleProps) {
           videoMode ? "bg-sage" : "bg-paper-2",
         )}
       >
-        <span className="sr-only">{videoMode ? "Video on" : "Video off"}</span>
+        <span className="sr-only">{videoMode ? t.setup.video.on : t.setup.video.off}</span>
         <span
           className={cn(
             "pointer-events-none inline-block h-5 w-5 rounded-full border-1.5 border-ink shadow-pop-sm",

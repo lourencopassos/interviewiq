@@ -19,7 +19,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for how the real-time pipeline works and 
 - Company research with web search, cached for a week per company
 - Adaptive question flow: follow-ups when an answer scores under 65, skips of easy questions after a very strong answer
 - Interview types: phone screen, technical, behavioral, system design, and **Full Loop** (all four stages in one session with spoken transitions)
-- Difficulty levels junior to staff, in English or Brazilian Portuguese
+- Difficulty levels junior to staff; interviews in English, Brazilian Portuguese or Spanish
+- Interface in English, Português or Español, switchable from the nav
 - Optional resume/CV text so questions reference your background
 - Coaching report with verdict, four dimension scores, study plan with resources, per-question review, and PDF export via print
 - Session history, resume of interrupted interviews, and refresh-safe state (everything authoritative lives in Postgres)
@@ -59,6 +60,7 @@ Open `http://localhost:3000/new`, paste a job description, pick the interview ty
 | `ELEVENLABS_API_KEY` | yes | Interviewer voice |
 | `DATABASE_URL` | yes | Postgres connection string. Default matches `docker-compose.yml`. |
 | `CLAUDE_MODEL` | no | Override the Claude model id. Default `claude-sonnet-5`. |
+| `ELEVENLABS_VOICE_EN` / `_PT_BR` / `_ES` | no | Override the ElevenLabs voice id per interview language |
 | `DID_API_KEY` | no | Enables the video interviewer |
 | `DID_PRESENTER_URL` | no | Portrait image for the avatar. Defaults to a public D-ID sample. |
 

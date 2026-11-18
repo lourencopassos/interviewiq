@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 interface InterviewHeaderProps {
   companyName: string;
@@ -40,6 +41,7 @@ export function InterviewHeader({
   progress,
   status,
 }: InterviewHeaderProps) {
+  const { t } = useI18n();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -52,6 +54,9 @@ export function InterviewHeader({
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
   const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+  const difficultyLabel =
+    (t.common.difficulty as Record<string, string>)[difficulty] ?? difficulty;
 
   return (
     <div className="sticky top-0 z-30 -mx-2 bg-paper/90 px-2 pb-2 pt-2 backdrop-blur-md">
@@ -74,7 +79,7 @@ export function InterviewHeader({
                 variant={difficultyTone[difficulty] ?? "outline"}
                 className="hidden sm:inline-flex"
               >
-                {difficulty}
+                {difficultyLabel}
               </Badge>
             </div>
             {jobTitle && (
@@ -99,7 +104,7 @@ export function InterviewHeader({
           </span>
           <time
             className="rounded-md border border-line-strong bg-sheet px-2 py-0.5 text-[12px] font-semibold tabular-nums text-ink-2"
-            aria-label="Elapsed time"
+            aria-label={t.interview.header.elapsed}
           >
             {timeStr}
           </time>

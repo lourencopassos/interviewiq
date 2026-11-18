@@ -2,8 +2,20 @@ import { isMockMode, delay } from "../mock";
 import { getMockSilenceBuffer } from "../mock/mock-audio";
 import { getNextMockTranscript } from "../mock/fixtures/transcript";
 
-const EN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Rachel — professional, neutral
-const PT_VOICE_ID = "GBv7mTt0atIp3Br8iCZE"; // Thomas — multilingual, supports PT-BR
+// ElevenLabs premade voices. eleven_turbo_v2_5 is multilingual, so any voice can
+// speak any supported language; these are sensible defaults, overridable per language.
+const VOICE_BY_LANGUAGE: Record<string, string> = {
+  EN: process.env.ELEVENLABS_VOICE_EN || "EXAVITQu4vr4xnSDxMaL", // Rachel — professional, neutral
+  PT_BR: process.env.ELEVENLABS_VOICE_PT_BR || "GBv7mTt0atIp3Br8iCZE", // Thomas — multilingual
+  ES: process.env.ELEVENLABS_VOICE_ES || "ErXwobaYiN019PkySvjV", // Antoni — multilingual
+};
+
+/** Whisper ISO-639-1 code and a transcription prompt per interview language. */
+const WHISPER_BY_LANGUAGE: Record<string, { code: string; prompt: string }> = {
+  EN: { code: "en", prompt: "This is a technical interview answer about software engineering." },
+  PT_BR: { code: "pt", prompt: "Esta é uma resposta de entrevista técnica sobre engenharia de software." },
+  ES: { code: "es", prompt: "Esta es una respuesta de entrevista técnica sobre ingeniería de software." },
+};
 
 export class AudioPipelineError extends Error {
   constructor(
@@ -49,7 +61,7 @@ export class AudioPipeline {
       return getNextMockTranscript();
     }
 
-    const lang = language === "PT_BR" ? "pt" : "en";
+    const whisper = WHISPER_BY_LANGUAGE[language] ?? WHISPER_BY_LANGUAGE.EN;
     const { type, extension } = normalizeAudioType(mimeType);
 
     try {
@@ -60,13 +72,8 @@ export class AudioPipeline {
         `answer.${extension}`,
       );
       formData.append("model", "whisper-1");
-      formData.append("language", lang);
-      formData.append(
-        "prompt",
-        lang === "pt"
-          ? "Esta é uma resposta de entrevista técnica sobre engenharia de software."
-          : "This is a technical interview answer about software engineering.",
-      );
+      formData.append("language", whisper.code);
+      formData.append("prompt", whisper.prompt);
 
       const response = await fetch(
         "https://api.openai.com/v1/audio/transcriptions",
@@ -102,7 +109,7 @@ export class AudioPipeline {
       return getMockSilenceBuffer();
     }
 
-    const voiceId = language === "PT_BR" ? PT_VOICE_ID : EN_VOICE_ID;
+    const voiceId = VOICE_BY_LANGUAGE[language] ?? VOICE_BY_LANGUAGE.EN;
 
     try {
       const response = await fetch(

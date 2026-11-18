@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Mic, History, Plus } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSelect } from "@/components/language-select";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-
-const tabs = [
-  { href: "/new", label: "Practice", icon: Plus },
-  { href: "/history", label: "History", icon: History },
-];
 
 /**
  * Top bar in the reference's voice: a logo tile, pill tabs, utilities on the right.
@@ -17,12 +14,18 @@ const tabs = [
  */
 export function SiteNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   if (pathname?.startsWith("/interview/")) return null;
+
+  const tabs = [
+    { href: "/new", label: t.nav.practice, icon: Plus },
+    { href: "/history", label: t.nav.history, icon: History },
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md print:hidden">
       <div className="container flex h-14 items-center gap-4">
-        <Link href="/" className="group flex items-center gap-2.5" aria-label="InterviewIQ home">
+        <Link href="/" className="group flex items-center gap-2.5" aria-label={t.nav.home}>
           <span className="tile-pop tile-pop-hover flex h-8 w-8 items-center justify-center rounded-md bg-peach text-peach-deep shadow-pop-sm">
             <Mic className="h-4 w-4" />
           </span>
@@ -56,8 +59,9 @@ export function SiteNav() {
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground md:inline-flex">
             <span className="led bg-sage-deep text-sage-deep/40" aria-hidden />
-            Local · BYO keys
+            {t.nav.local}
           </span>
+          <LanguageSelect />
           <ThemeToggle />
         </div>
       </div>

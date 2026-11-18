@@ -2,8 +2,10 @@ import {
   answerEvaluationSchema,
   type AnswerEvaluation,
   type Difficulty,
+  type Language,
 } from "@interviewiq/types";
 import { callClaude } from "../client";
+import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
 
 function buildSystemPrompt(params: {
@@ -14,6 +16,7 @@ function buildSystemPrompt(params: {
   targetSkill: string;
   scoringGuide: { poor: string; good: string; excellent: string };
   resumeText?: string | null;
+  language?: Language;
 }): string {
   const { companyName, jobTitle, difficulty, questionText, targetSkill, scoringGuide, resumeText } = params;
 
@@ -51,6 +54,7 @@ Use this context to:
 - Provide feedback that references their specific background
 - Note when answers align well with or fall short of stated experience
 ` : ""}
+${languageInstruction(params.language)}
 Return ONLY valid JSON.`;
 }
 
@@ -63,6 +67,7 @@ export async function evaluateAnswer(params: {
   scoringGuide: { poor: string; good: string; excellent: string };
   transcript: string;
   resumeText?: string | null;
+  language?: Language;
 }): Promise<AnswerEvaluation> {
   const { transcript, ...promptParams } = params;
   const systemPrompt = buildSystemPrompt(promptParams);

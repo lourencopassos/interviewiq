@@ -2,6 +2,7 @@
 
 import { Mic, CornerDownRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { interpolate, useI18n } from "@/lib/i18n";
 
 interface QuestionCardProps {
   text: string;
@@ -11,13 +12,6 @@ interface QuestionCardProps {
   /** Marks an adaptive follow-up inserted after a weak answer. */
   isFollowUp?: boolean;
 }
-
-const categoryLabels: Record<string, string> = {
-  technical: "Technical",
-  behavioral: "Behavioral",
-  system_design: "System Design",
-  culture_fit: "Culture Fit",
-};
 
 const categoryTone: Record<string, "sky" | "sage" | "butter" | "lavender"> = {
   technical: "sky",
@@ -34,6 +28,10 @@ export function QuestionCard({
   total,
   isFollowUp = false,
 }: QuestionCardProps) {
+  const { t } = useI18n();
+  const categoryLabel =
+    (t.interview.question.category as Record<string, string>)[category] ?? category;
+
   return (
     <article className="tile animate-pop-in p-5 sm:p-6">
       <div className="flex gap-4">
@@ -42,17 +40,16 @@ export function QuestionCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="eyebrow">
-              Interviewer · question <span className="tabular-nums">{order}</span> of{" "}
-              <span className="tabular-nums">{total}</span>
+            <span className="eyebrow tabular-nums">
+              {interpolate(t.interview.question.eyebrow, { order, total })}
             </span>
             {isFollowUp && (
               <span className="pill animate-pop-in bg-lavender text-lavender-deep">
-                <CornerDownRight className="h-3 w-3" /> follow-up
+                <CornerDownRight className="h-3 w-3" /> {t.interview.question.followUp}
               </span>
             )}
             <Badge variant={categoryTone[category] ?? "outline"} className="ml-auto">
-              {categoryLabels[category] || category}
+              {categoryLabel}
             </Badge>
           </div>
           <p className="text-[16px] font-medium leading-relaxed text-ink sm:text-[17px]">

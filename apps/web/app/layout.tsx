@@ -3,6 +3,8 @@ import { JetBrains_Mono } from "next/font/google";
 import { MockToggle } from "@/components/mock-toggle";
 import { SiteNav } from "@/components/site-nav";
 import { themeInitScript } from "@/components/theme-toggle";
+import { I18nProvider, getDictionary, LOCALE_TAGS } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 const mono = JetBrains_Mono({
@@ -11,39 +13,35 @@ const mono = JetBrains_Mono({
   weight: ["400", "500", "600", "700", "800"],
 });
 
-export const metadata: Metadata = {
-  title: "InterviewIQ — Mock interviews that know the company",
-  description:
-    "Paste a job description, get an adaptive voice interview from an AI that researched the company, and walk away with a coaching report and study plan.",
-  openGraph: {
-    title: "InterviewIQ — Mock interviews that know the company",
-    description:
-      "Adaptive voice interviews with real company research and a coaching report at the end. Self-hosted, bring your own keys.",
-    type: "website",
-    siteName: "InterviewIQ",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "InterviewIQ — Mock interviews that know the company",
-    description:
-      "Adaptive voice interviews with real company research and a coaching report at the end.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  const { meta } = getDictionary(locale).landing;
+  return {
+    title: meta.title,
+    description: meta.description,
+    openGraph: { title: meta.title, description: meta.description, type: "website", siteName: "InterviewIQ" },
+    twitter: { card: "summary_large_image", title: meta.title, description: meta.description },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en" className={mono.variable} suppressHydrationWarning>
+    <html lang={LOCALE_TAGS[locale]} className={mono.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-screen font-mono">
-        <SiteNav />
-        <main className="min-h-screen">{children}</main>
-        <MockToggle />
+        <I18nProvider locale={locale}>
+          <SiteNav />
+          <main className="min-h-screen">{children}</main>
+          <MockToggle />
+        </I18nProvider>
       </body>
     </html>
   );

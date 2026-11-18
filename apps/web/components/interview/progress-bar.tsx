@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { interpolate, useI18n } from "@/lib/i18n";
 
 interface ProgressBarProps {
   current: number;
@@ -15,6 +16,7 @@ interface ProgressBarProps {
  * that is solid where the candidate has been and dashed where they have not.
  */
 export function ProgressBar({ current, total, isFollowUp = false }: ProgressBarProps) {
+  const { t } = useI18n();
   if (total <= 0) return null;
 
   // Long sessions (follow-ups grow the total) collapse to unnumbered dots.
@@ -22,7 +24,10 @@ export function ProgressBar({ current, total, isFollowUp = false }: ProgressBarP
   const steps = Array.from({ length: total }, (_, i) => i + 1);
 
   return (
-    <nav aria-label={`Question ${current} of ${total}`} className="w-full">
+    <nav
+      aria-label={interpolate(t.interview.progress.label, { current, total })}
+      className="w-full"
+    >
       <ol className="flex w-full items-center">
         {steps.map((n) => {
           const done = n < current;

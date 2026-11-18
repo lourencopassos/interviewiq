@@ -1,5 +1,6 @@
-import type { InterviewStage } from "@interviewiq/types";
+import type { InterviewStage, Language } from "@interviewiq/types";
 import { callClaudePlainText } from "../client";
+import { languageInstruction } from "./language";
 
 function buildSystemPrompt(params: {
   companyName: string;
@@ -7,6 +8,7 @@ function buildSystemPrompt(params: {
   completedStage: string;
   completedStageScore: number;
   nextStage: string;
+  language?: Language;
 }): string {
   const {
     companyName,
@@ -29,6 +31,7 @@ Generate a brief, natural-sounding transition (2-3 sentences) that:
 
 ${completedStageScore >= 75 ? "The candidate did well — be encouraging." : completedStageScore >= 50 ? "The candidate did okay — be neutral and supportive." : "The candidate struggled — be encouraging and reassuring."}
 
+${languageInstruction(params.language)}
 Return ONLY the transition text. No JSON, no quotes, no formatting. This will be spoken aloud via text-to-speech.`;
 }
 
@@ -39,6 +42,7 @@ export async function generateStageTransition(params: {
   completedStageLabel: string;
   completedStageScore: number;
   nextStageLabel: string;
+  language?: Language;
 }): Promise<string> {
   try {
     const text = await callClaudePlainText(
@@ -48,6 +52,7 @@ export async function generateStageTransition(params: {
         completedStage: params.completedStageLabel,
         completedStageScore: params.completedStageScore,
         nextStage: params.nextStageLabel,
+        language: params.language,
       }),
       "Generate the stage transition narration.",
       { maxTokens: 256 },

@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useSetupStore } from "@/lib/stores/setup-store";
+import { useI18n, interpolate, defaultInterviewLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Difficulty, InterviewType, Language } from "@interviewiq/types";
 
@@ -11,25 +13,15 @@ interface Option<T extends string> {
   meta?: string;
 }
 
-const DIFFICULTY_OPTIONS: Option<Difficulty>[] = [
-  { value: "JUNIOR", label: "Junior", meta: "5 questions" },
-  { value: "MID", label: "Mid", meta: "6 questions" },
-  { value: "SENIOR", label: "Senior", meta: "7 questions" },
-  { value: "STAFF", label: "Staff", meta: "8 questions" },
-];
+/** Store default; the UI-locale default only applies while this is untouched. */
+const INITIAL_LANGUAGE: Language = "EN";
 
-const INTERVIEW_TYPE_OPTIONS: Option<InterviewType>[] = [
-  { value: "PHONE_SCREEN", label: "Phone screen", meta: "warm-up round" },
-  { value: "TECHNICAL", label: "Technical", meta: "deep dives" },
-  { value: "BEHAVIORAL", label: "Behavioral", meta: "stories, STAR" },
-  { value: "SYSTEM_DESIGN", label: "System design", meta: "architecture" },
-  { value: "FULL_LOOP", label: "Full loop", meta: "4 stages" },
-];
-
-const LANGUAGE_OPTIONS: Option<Language>[] = [
-  { value: "EN", label: "English", meta: "EN" },
-  { value: "PT_BR", label: "Português", meta: "PT-BR" },
-];
+const QUESTION_COUNT: Record<Difficulty, number> = {
+  JUNIOR: 5,
+  MID: 6,
+  SENIOR: 7,
+  STAFF: 8,
+};
 
 interface OptionTilesProps<T extends string> {
   label: string;
@@ -90,6 +82,7 @@ function OptionTiles<T extends string>({
 }
 
 export function InterviewConfig() {
+  const { t, locale } = useI18n();
   const {
     difficulty,
     interviewType,
@@ -101,11 +94,44 @@ export function InterviewConfig() {
   } = useSetupStore();
   const disabled = step !== "input" && step !== "error";
 
+  // Once per mount: if the user hasn't picked a language yet, follow the UI
+  // locale. The ref keeps this from ever running again (and overriding a choice).
+  const defaultedLanguage = useRef(false);
+  useEffect(() => {
+    if (defaultedLanguage.current) return;
+    defaultedLanguage.current = true;
+    if (language !== INITIAL_LANGUAGE) return;
+    const preferred = defaultInterviewLanguage(locale);
+    if (preferred !== language) setLanguage(preferred);
+  }, [locale, language, setLanguage]);
+
+  const difficultyOptions: Option<Difficulty>[] = (
+    ["JUNIOR", "MID", "SENIOR", "STAFF"] as const
+  ).map((value) => ({
+    value,
+    label: t.common.difficulty[value],
+    meta: interpolate(t.setup.configure.questions, { count: QUESTION_COUNT[value] }),
+  }));
+
+  const interviewTypeOptions: Option<InterviewType>[] = (
+    ["PHONE_SCREEN", "TECHNICAL", "BEHAVIORAL", "SYSTEM_DESIGN", "FULL_LOOP"] as const
+  ).map((value) => ({
+    value,
+    label: t.common.interviewType[value],
+    meta: t.setup.configure.typeMeta[value],
+  }));
+
+  const languageOptions: Option<Language>[] = [
+    { value: "EN", label: t.common.interviewLanguage.EN, meta: "EN" },
+    { value: "PT_BR", label: t.common.interviewLanguage.PT_BR, meta: "PT-BR" },
+    { value: "ES", label: t.common.interviewLanguage.ES, meta: "ES" },
+  ];
+
   return (
     <div className="space-y-5">
       <OptionTiles
-        label="Difficulty"
-        options={DIFFICULTY_OPTIONS}
+        label={t.setup.configure.difficulty}
+        options={difficultyOptions}
         value={difficulty}
         onChange={setDifficulty}
         disabled={disabled}
@@ -113,8 +139,8 @@ export function InterviewConfig() {
       />
 
       <OptionTiles
-        label="Interview type"
-        options={INTERVIEW_TYPE_OPTIONS}
+        label={t.setup.configure.interviewType}
+        options={interviewTypeOptions}
         value={interviewType}
         onChange={setInterviewType}
         disabled={disabled}
@@ -122,12 +148,12 @@ export function InterviewConfig() {
       />
 
       <OptionTiles
-        label="Language"
-        options={LANGUAGE_OPTIONS}
+        label={t.setup.configure.language}
+        options={languageOptions}
         value={language}
         onChange={setLanguage}
         disabled={disabled}
-        className="grid-cols-2"
+        className="grid-cols-3"
       />
     </div>
   );

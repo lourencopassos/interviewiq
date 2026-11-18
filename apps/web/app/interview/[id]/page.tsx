@@ -18,11 +18,15 @@ import { TranscriptPreview } from "@/components/interview/transcript-preview";
 import { ProgressBar } from "@/components/interview/progress-bar";
 import { TransitionCard } from "@/components/interview/transition-card";
 import { ConnectionStatus } from "@/components/interview/connection-status";
-import { StageTransitionCard } from "@/components/interview/stage-transition-card";
+import {
+  StageTransitionCard,
+  localizeStage,
+} from "@/components/interview/stage-transition-card";
 import { VideoLayout } from "@/components/interview/video-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { interpolate, useI18n } from "@/lib/i18n";
 
 type InterviewPhase =
   | "loading"
@@ -44,10 +48,13 @@ type LastAction = "start" | "submit" | null;
  */
 const startedSessions = new Set<string>();
 
-function errorMessage(err: unknown, fallback: string): string {
-  if (err instanceof TypeError) return "Network error — please check your connection";
+function errorMessage(
+  err: unknown,
+  copy: { network: string; fallback: string },
+): string {
+  if (err instanceof TypeError) return copy.network;
   if (err instanceof Error && err.message) return err.message;
-  return fallback;
+  return copy.fallback;
 }
 
 function toRecordPhase(phase: InterviewPhase): RecordPhase {
@@ -68,6 +75,11 @@ function toRecordPhase(phase: InterviewPhase): RecordPhase {
 export default function InterviewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useI18n();
+  // Latest dictionary for the async handlers, so their dependency lists (and
+  // the start effect that keys off `startInterview`) are unaffected by locale.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [phase, setPhase] = useState<InterviewPhase>("loading");
   const [sessionMeta, setSessionMeta] = useState<{
@@ -109,14 +121,19 @@ export default function InterviewPage() {
           throw new Error(
             typeof data?.error === "string"
               ? data.error
-              : `Failed to start interview (${res.status})`,
+              : interpolate(tRef.current.interview.errors.startFailedStatus, { status: res.status }),
           );
         }
       } catch (err) {
         // Allow a retry to POST again
         startedSessions.delete(id);
         console.error("Interview start failed:", err);
-        setStartError(errorMessage(err, "Failed to start interview"));
+        setStartError(
+          errorMessage(err, {
+            network: tRef.current.interview.errors.network,
+            fallback: tRef.current.interview.errors.startFailed,
+          }),
+        );
       } finally {
         setIsStarting(false);
       }
@@ -275,8 +292,11 @@ export default function InterviewPage() {
       }
       const message =
         err instanceof DOMException && err.name === "NotFoundError"
-          ? "No microphone was found. Connect one and try again."
-          : errorMessage(err, "Could not start recording");
+          ? tRef.current.interview.errors.noMicrophone
+          : errorMessage(err, {
+              network: tRef.current.interview.errors.network,
+              fallback: tRef.current.interview.errors.recordStartFailed,
+            });
       setRecordError(message);
     }
   }, [recorder]);
@@ -291,7 +311,18 @@ export default function InterviewPage() {
         await interview.submitAnswer(blob);
       } catch (err) {
         console.error("Failed to submit answer:", err);
-        setSubmitError(errorMessage(err, "Failed to submit your answer"));
+        // useInterviewStream throws fixed English messages for its own failures;
+        // translate those here and pass server-provided messages through.
+        const hookMessage = err instanceof Error ? err.message : "";
+        const message = hookMessage.startsWith("Network error")
+          ? tRef.current.interview.errors.uploadNetwork
+          : hookMessage.startsWith("Failed to submit answer")
+            ? tRef.current.interview.errors.submitFailed
+            : errorMessage(err, {
+                network: tRef.current.interview.errors.network,
+                fallback: tRef.current.interview.errors.submitFailed,
+              });
+        setSubmitError(message);
         setPhase("ready_to_record");
       }
     },
@@ -303,7 +334,17 @@ export default function InterviewPage() {
     try {
       blob = await recorder.stopRecording();
     } catch (err) {
-      setRecordError(errorMessage(err, "Recording failed — please try again"));
+      // useAudioRecorder rejects with "No active recording" / "Recording failed";
+      // both read as a failed recording to the user.
+      const hookMessage = err instanceof Error ? err.message : "";
+      const message =
+        hookMessage === "No active recording" || hookMessage === "Recording failed"
+          ? tRef.current.interview.errors.recordFailed
+          : errorMessage(err, {
+              network: tRef.current.interview.errors.network,
+              fallback: tRef.current.interview.errors.recordFailed,
+            });
+      setRecordError(message);
       setPhase("ready_to_record");
       return;
     }
@@ -403,30 +444,37 @@ export default function InterviewPage() {
     "isFollowUp" in currentQuestion &&
     currentQuestion.isFollowUp === true;
 
+  // Server `error` events with a known code get interface-language copy;
+  // anything else shows the server's message as-is.
+  const serverErrorMessage = interview.error
+    ? ((t.interview.serverErrors as Record<string, string>)[interview.error.code] ??
+      interview.error.message)
+    : null;
+
   // Inline error alerts (rendered in both the loading view and the main layout)
   const errorAlerts = (
     <>
       {interview.error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Something went wrong</AlertTitle>
+          <AlertTitle>{t.interview.alerts.server.title}</AlertTitle>
           <AlertDescription className="space-y-3">
-            <p>{interview.error.message}</p>
+            <p>{serverErrorMessage}</p>
             <div className="flex flex-wrap gap-2">
               {interview.error.retryable ? (
                 <Button size="sm" variant="outline" onClick={handleRetryLastAction} className="gap-1">
                   <RefreshCw className="h-3 w-3" />
-                  Retry
+                  {t.common.retry}
                 </Button>
               ) : (
                 <Link href="/new">
                   <Button size="sm" variant="outline">
-                    Start a new interview
+                    {t.interview.alerts.server.newInterview}
                   </Button>
                 </Link>
               )}
               <Button size="sm" variant="ghost" onClick={interview.clearError}>
-                Dismiss
+                {t.common.dismiss}
               </Button>
             </div>
           </AlertDescription>
@@ -436,7 +484,7 @@ export default function InterviewPage() {
       {startError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Could not start the interview</AlertTitle>
+          <AlertTitle>{t.interview.alerts.start.title}</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{startError}</p>
             <div className="flex flex-wrap gap-2">
@@ -448,11 +496,11 @@ export default function InterviewPage() {
                 className="gap-1"
               >
                 <RefreshCw className="h-3 w-3" />
-                {isStarting ? "Retrying..." : "Retry"}
+                {isStarting ? t.interview.alerts.start.retrying : t.common.retry}
               </Button>
               <Link href="/new">
                 <Button size="sm" variant="ghost">
-                  Back to setup
+                  {t.interview.alerts.start.back}
                 </Button>
               </Link>
             </div>
@@ -463,7 +511,7 @@ export default function InterviewPage() {
       {submitError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Your answer was not submitted</AlertTitle>
+          <AlertTitle>{t.interview.alerts.submit.title}</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{submitError}</p>
             <div className="flex flex-wrap gap-2">
@@ -476,11 +524,13 @@ export default function InterviewPage() {
                   className="gap-1"
                 >
                   <RefreshCw className="h-3 w-3" />
-                  {isResubmitting ? "Retrying..." : "Retry upload"}
+                  {isResubmitting
+                    ? t.interview.alerts.submit.retrying
+                    : t.interview.alerts.submit.retryUpload}
                 </Button>
               )}
               <Button size="sm" variant="ghost" onClick={() => setSubmitError(null)}>
-                Record again
+                {t.interview.alerts.submit.recordAgain}
               </Button>
             </div>
           </AlertDescription>
@@ -490,15 +540,12 @@ export default function InterviewPage() {
       {micDenied && (
         <Alert variant="warning">
           <MicOff className="h-4 w-4" />
-          <AlertTitle>Microphone access is blocked</AlertTitle>
+          <AlertTitle>{t.interview.alerts.mic.title}</AlertTitle>
           <AlertDescription className="space-y-3">
-            <p>
-              Allow microphone access for this site in your browser settings,
-              then try again.
-            </p>
+            <p>{t.interview.alerts.mic.body}</p>
             <Button size="sm" variant="outline" onClick={handleStartRecording} className="gap-1">
               <RefreshCw className="h-3 w-3" />
-              Retry
+              {t.common.retry}
             </Button>
           </AlertDescription>
         </Alert>
@@ -507,12 +554,12 @@ export default function InterviewPage() {
       {recordError && !micDenied && (
         <Alert variant="destructive">
           <MicOff className="h-4 w-4" />
-          <AlertTitle>Recording problem</AlertTitle>
+          <AlertTitle>{t.interview.alerts.recording.title}</AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{recordError}</p>
             <Button size="sm" variant="outline" onClick={handleStartRecording} className="gap-1">
               <RefreshCw className="h-3 w-3" />
-              Retry
+              {t.common.retry}
             </Button>
           </AlertDescription>
         </Alert>
@@ -555,10 +602,10 @@ export default function InterviewPage() {
             <span className="led led-live bg-sage-deep text-sage-deep/40" aria-hidden />
           )}
           {startError
-            ? "Interview not started."
+            ? t.interview.loading.notStarted
             : isStarting
-              ? "Generating your interview questions…"
-              : "Connecting to interview session…"}
+              ? t.interview.loading.generating
+              : t.interview.loading.connecting}
         </p>
         <div className="mt-4 flex justify-center">
           <ConnectionStatus
@@ -578,13 +625,13 @@ export default function InterviewPage() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full border-1.5 border-ink bg-card text-sage-deep shadow-pop">
             <Check className="h-8 w-8" strokeWidth={3} aria-hidden />
           </div>
-          <p className="eyebrow text-sage-deep">Interview complete</p>
+          <p className="eyebrow text-sage-deep">{t.interview.complete.eyebrow}</p>
           <h2 className="text-2xl text-sage-deep sm:text-3xl">
-            That was the last question.
+            {t.interview.complete.title}
           </h2>
           <p className="flex items-center gap-2 text-[13px] font-semibold">
             <span className="led led-live bg-sage-deep text-sage-deep/40" aria-hidden />
-            Building your report…
+            {t.interview.complete.building}
           </p>
         </div>
       </div>
@@ -596,7 +643,7 @@ export default function InterviewPage() {
     <>
       {/* Header: company · role | step rail | timer · connection */}
       <InterviewHeader
-        companyName={sessionMeta?.companyName || "Interview"}
+        companyName={sessionMeta?.companyName || t.interview.header.fallbackCompany}
         jobTitle={sessionMeta?.jobTitle || ""}
         difficulty={sessionMeta?.difficulty || "MID"}
         questionOrder={interview.currentQuestion?.order || 0}
@@ -634,7 +681,7 @@ export default function InterviewPage() {
         <div className="flex justify-center">
           <span className="pill bg-lavender text-lavender-deep">
             <Layers className="h-3 w-3" aria-hidden />
-            {interview.currentStage}
+            {localizeStage(interview.currentStage, t)}
           </span>
         </div>
       )}
@@ -676,8 +723,8 @@ export default function InterviewPage() {
           onStop={handleStopRecording}
         />
         <p className="hidden items-center justify-center gap-2 pb-2 text-[10px] text-muted-foreground sm:flex print:hidden">
-          <span className="kbd">Space</span> record · stop
-          <span className="kbd ml-2">R</span> replay the question
+          <span className="kbd">Space</span> {t.interview.shortcuts.record}
+          <span className="kbd ml-2">R</span> {t.interview.shortcuts.replay}
         </p>
       </div>
 

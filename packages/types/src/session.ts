@@ -20,6 +20,7 @@ export type InterviewType = (typeof InterviewType)[keyof typeof InterviewType];
 export const Language = {
   EN: "EN",
   PT_BR: "PT_BR",
+  ES: "ES",
 } as const;
 export type Language = (typeof Language)[keyof typeof Language];
 
@@ -79,7 +80,7 @@ export const createSessionRequestSchema = z.object({
     "SYSTEM_DESIGN",
     "FULL_LOOP",
   ]),
-  language: z.enum(["EN", "PT_BR"]),
+  language: z.enum(["EN", "PT_BR", "ES"]),
   videoMode: z.boolean().optional().default(false),
   resumeText: z.string().max(20000).optional(),
   parsedJob: z.string().optional(),

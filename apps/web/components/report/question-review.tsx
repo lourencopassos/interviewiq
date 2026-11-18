@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { interpolate, useI18n } from "@/lib/i18n";
 import { scoreTone, toneStyles } from "./score-tone";
 
 interface ReviewQuestion {
@@ -29,9 +30,14 @@ const categoryTone: Record<string, string> = {
 };
 
 function QuestionCard({ question }: { question: ReviewQuestion }) {
+  const { t } = useI18n();
+  const copy = t.report.questionReview;
   const [isOpen, setIsOpen] = useState(false);
   const panelId = `question-review-${question.id}`;
   const tone = question.score !== null ? toneStyles[scoreTone(question.score)] : null;
+  const categoryLabel =
+    (copy.category as Record<string, string>)[question.category] ??
+    question.category.replace(/_/g, " ");
 
   return (
     <div className="tile overflow-hidden">
@@ -44,13 +50,14 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
       >
         <div className="flex min-w-0 items-center gap-3">
           <span className="eyebrow shrink-0 tabular-nums text-ink">
-            q{String(question.order + 1).padStart(2, "0")}
+            {copy.questionPrefix}
+            {String(question.order + 1).padStart(2, "0")}
           </span>
           <span className="truncate text-[13px] font-semibold text-ink">{question.text}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className={cn("pill hidden sm:inline-flex", categoryTone[question.category] ?? "bg-card")}>
-            {question.category.replace(/_/g, " ")}
+            {categoryLabel}
           </span>
           {question.score !== null && tone && (
             <span
@@ -85,7 +92,7 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
             {question.transcript && (
               <div className="sheet p-4">
                 <p className="eyebrow">
-                  <span className="text-sky-deep">you said</span>
+                  <span className="text-sky-deep">{copy.youSaid}</span>
                 </p>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{question.transcript}</p>
               </div>
@@ -93,7 +100,7 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
 
             {question.feedback && (
               <div>
-                <p className="eyebrow">interviewer&apos;s notes</p>
+                <p className="eyebrow">{copy.interviewerNotes}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-ink-2">{question.feedback}</p>
               </div>
             )}
@@ -102,7 +109,7 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
               <div className="grid gap-3 sm:grid-cols-2">
                 {question.strengths.length > 0 && (
                   <div>
-                    <p className="eyebrow mb-1.5">strengths</p>
+                    <p className="eyebrow mb-1.5">{copy.strengths}</p>
                     <ul className="flex flex-wrap gap-1.5">
                       {question.strengths.map((s, i) => (
                         <li key={i} className="pill bg-sage py-1 text-left font-medium text-sage-deep">
@@ -114,7 +121,7 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
                 )}
                 {question.gaps.length > 0 && (
                   <div>
-                    <p className="eyebrow mb-1.5">gaps</p>
+                    <p className="eyebrow mb-1.5">{copy.gaps}</p>
                     <ul className="flex flex-wrap gap-1.5">
                       {question.gaps.map((g, i) => (
                         <li key={i} className="pill bg-blush py-1 text-left font-medium text-blush-deep">
@@ -134,15 +141,19 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
 }
 
 export function QuestionReview({ questions }: QuestionReviewProps) {
+  const { t } = useI18n();
+  const copy = t.report.questionReview;
   if (questions.length === 0) return null;
 
   return (
-    <section aria-label="Question review">
+    <section aria-label={copy.sectionLabel}>
       <div className="mb-3 flex items-center justify-between">
         <p className="eyebrow">
-          <span className="text-ink">[ question review ]</span> your words next to the notes
+          <span className="text-ink">[ {copy.eyebrow} ]</span> {copy.tagline}
         </p>
-        <span className="pill bg-card tabular-nums">{questions.length} answered</span>
+        <span className="pill bg-card tabular-nums">
+          {interpolate(copy.answered, { n: questions.length })}
+        </span>
       </div>
       <div className="space-y-3">
         {questions.map((q) => (

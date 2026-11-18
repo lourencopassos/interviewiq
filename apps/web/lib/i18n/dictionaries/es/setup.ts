@@ -1,0 +1,96 @@
+import type { setup as En } from "../en/setup";
+
+export const setup: typeof En = {
+  header: {
+    eyebrowLead: "nueva sesión",
+    eyebrowRest: "pegar · analizar · empezar",
+    title: "Configura la entrevista.",
+    body: "Pega una oferta de trabajo. El entrevistador extrae el puesto y el stack, investiga la empresa y luego te hace las preguntas en voz alta.",
+  },
+  charCount: "{count} caracteres",
+  posting: {
+    label: "pega la oferta",
+    placeholder:
+      "Pega la descripción completa del puesto, requisitos incluidos. Cuanto más texto, más precisas las preguntas.",
+    enough: "Suficiente para analizar",
+    moreCharsOne: "Falta 1 carácter",
+    moreCharsOther: "Faltan {count} caracteres",
+    timing: "El análisis y la investigación de la empresa tardan unos 40 segundos.",
+    analyze: "Analizar la oferta",
+  },
+  analysis: {
+    failedTitle: "El análisis falló",
+    ariaLabel: "Progreso del análisis",
+    logTitle: "análisis · registro",
+    ready: "listo",
+    working: "en curso",
+    done: "hecho",
+    running: "ejecutando",
+    queued: "en cola",
+    steps: {
+      parse: "Analizar la oferta",
+      research: "Investigar la empresa",
+      ready: "Listo para empezar",
+    },
+    errors: {
+      network: "Error de red: revisa tu conexión",
+      parseFailed: "No se pudo analizar la descripción del puesto",
+      unknown: "Algo salió mal",
+    },
+  },
+  preview: {
+    parsed: "analizado",
+    clear: "Borrar el análisis y volver a analizar",
+    skills: "Lo que buscan",
+    focus: "Hacia dónde irán las preguntas",
+    intel: "Inteligencia de la empresa · búsqueda web",
+    techStack: "Stack técnico",
+    culture: "Cultura de ingeniería",
+    coachingTip: "Consejo de coaching",
+  },
+  configure: {
+    eyebrow: "configurar",
+    title: "Cómo transcurre la sesión.",
+    difficulty: "Dificultad",
+    interviewType: "Tipo de entrevista",
+    language: "Idioma",
+    questions: "{count} preguntas",
+    typeMeta: {
+      PHONE_SCREEN: "ronda de calentamiento",
+      TECHNICAL: "a fondo",
+      BEHAVIORAL: "historias, STAR",
+      SYSTEM_DESIGN: "arquitectura",
+      FULL_LOOP: "4 etapas",
+    },
+  },
+  video: {
+    label: "Entrevista en video",
+    body: "Una llamada estilo Meet con el avatar del entrevistador y tu cámara. Apagado, queda solo el audio.",
+    on: "Video activado",
+    off: "Video desactivado",
+  },
+  resume: {
+    label: "Tu currículum",
+    placeholder:
+      "Pega tu currículum como texto. Las preguntas se apoyarán en lo que realmente hiciste.",
+    hint: "Si lo omites, el entrevistador trabaja solo con la oferta.",
+  },
+  start: {
+    ready: "listo",
+    video: "video",
+    audio: "audio",
+    withResume: "con currículum",
+    titleAt: "{title} en {company}",
+    creating: "Creando la sesión…",
+    button: "Empezar la entrevista",
+    permissionMic: "En la siguiente pantalla te pediremos acceso al micrófono.",
+    permissionMicCamera: "En la siguiente pantalla te pediremos acceso al micrófono y a la cámara.",
+    failedTitle: "No se pudo empezar la entrevista",
+    errors: {
+      network: "Error de red: revisa tu conexión e inténtalo de nuevo",
+      createFailed: "No se pudo crear la sesión ({status})",
+      unknown: "No se pudo crear la sesión",
+    },
+  },
+  startOver: "Empezar de nuevo con otra oferta",
+};

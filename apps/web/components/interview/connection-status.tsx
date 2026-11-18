@@ -3,29 +3,32 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
+
+type Status = "connecting" | "connected" | "reconnecting" | "error";
 
 interface ConnectionStatusProps {
-  status: "connecting" | "connected" | "reconnecting" | "error";
+  status: Status;
   /** Shown as a "Reconnect" action when the connection has given up. */
   onReconnect?: () => void;
 }
 
-const statusConfig = {
-  connecting: { led: "led-live bg-butter-deep text-butter-deep/40", label: "Connecting…" },
-  connected: { led: "bg-sage-deep text-sage-deep/40", label: "Connected" },
-  reconnecting: { led: "led-live bg-butter-deep text-butter-deep/40", label: "Reconnecting…" },
-  error: { led: "bg-blush-deep text-blush-deep/40", label: "Disconnected" },
+const statusLed: Record<Status, string> = {
+  connecting: "led-live bg-butter-deep text-butter-deep/40",
+  connected: "bg-sage-deep text-sage-deep/40",
+  reconnecting: "led-live bg-butter-deep text-butter-deep/40",
+  error: "bg-blush-deep text-blush-deep/40",
 };
 
 /** SSE connection pill: sage LED when connected, butter while (re)connecting, blush on error. */
 export function ConnectionStatus({ status, onReconnect }: ConnectionStatusProps) {
-  const config = statusConfig[status];
+  const { t } = useI18n();
 
   return (
     <div className="flex items-center gap-2">
       <span className="pill bg-card text-ink-2" role="status">
-        <span className={cn("led", config.led)} aria-hidden />
-        {config.label}
+        <span className={cn("led", statusLed[status])} aria-hidden />
+        {t.interview.connection[status]}
       </span>
       {status === "error" && onReconnect && (
         <Button
@@ -36,7 +39,7 @@ export function ConnectionStatus({ status, onReconnect }: ConnectionStatusProps)
           className="h-7 gap-1 px-2 text-[11px]"
         >
           <RefreshCw className="h-3 w-3" />
-          Reconnect
+          {t.interview.connection.reconnect}
         </Button>
       )}
     </div>
