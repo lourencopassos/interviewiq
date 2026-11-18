@@ -3,8 +3,10 @@ import {
   type CoachingReport,
   type Difficulty,
   type InterviewType,
+  type Language,
 } from "@interviewiq/types";
 import { callClaude } from "../client";
+import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
 
 interface QuestionWithAnswer {
@@ -22,6 +24,7 @@ function buildSystemPrompt(params: {
   difficulty: Difficulty;
   interviewType: InterviewType;
   resumeText?: string | null;
+  language?: Language;
 }): string {
   const { companyName, jobTitle, difficulty, interviewType, resumeText } = params;
 
@@ -80,6 +83,7 @@ Include in your report:
 - Gaps between stated experience and demonstrated knowledge
 - Tailor the study plan to build on their existing experience
 ` : ""}
+${languageInstruction(params.language)}
 Return ONLY valid JSON.`;
 }
 
@@ -90,6 +94,7 @@ export async function generateCoachingReport(params: {
   interviewType: InterviewType;
   questionsWithAnswers: QuestionWithAnswer[];
   resumeText?: string | null;
+  language?: Language;
 }): Promise<CoachingReport> {
   const { questionsWithAnswers, ...sessionParams } = params;
   const systemPrompt = buildSystemPrompt(sessionParams);

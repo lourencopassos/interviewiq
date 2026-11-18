@@ -83,6 +83,7 @@ enum InterviewType {
 enum Language {
   EN
   PT_BR
+  ES
 }
 
 model CompanyResearch {

@@ -6,6 +6,7 @@ const DID_API_BASE = "https://api.d-id.com";
 const DID_VOICE_BY_LANGUAGE: Record<string, string> = {
   EN: "en-US-JennyNeural",
   PT_BR: "pt-BR-FranciscaNeural",
+  ES: "es-MX-DaliaNeural",
 };
 
 /** After the SDP answer arrives, give ICE this long to connect before flushing queued text. */
