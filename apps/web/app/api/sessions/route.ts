@@ -28,6 +28,7 @@ export async function POST(request: Request) {
         interviewType: parsed.data.interviewType,
         language: parsed.data.language,
         videoMode: parsed.data.videoMode ?? false,
+        coachEnabled: parsed.data.coachEnabled ?? true,
         resumeText: parsed.data.resumeText,
         parsedJob: parsed.data.parsedJob,
         companyIntel: parsed.data.companyIntel,

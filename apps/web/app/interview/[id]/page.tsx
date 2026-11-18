@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, Check, Layers, MicOff, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, GraduationCap, Layers, MicOff, Pause, Play, RefreshCw } from "lucide-react";
 import { useInterviewStream } from "@/hooks/useInterviewStream";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useAvatarStream } from "@/hooks/useAvatarStream";
+import { useCoach } from "@/hooks/useCoach";
 import { getMockMode } from "@/lib/mock-mode";
 import { InterviewHeader } from "@/components/interview/interview-header";
 import { QuestionCard } from "@/components/interview/question-card";
@@ -23,6 +24,9 @@ import {
   localizeStage,
 } from "@/components/interview/stage-transition-card";
 import { VideoLayout } from "@/components/interview/video-layout";
+import { CoachDrawer } from "@/components/interview/coach-drawer";
+import { SelectionPopover } from "@/components/interview/selection-popover";
+import { PauseOverlay } from "@/components/interview/pause-overlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -87,7 +91,10 @@ export default function InterviewPage() {
     jobTitle: string;
     difficulty: string;
     videoMode: boolean;
+    coachEnabled: boolean;
   } | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -104,7 +111,9 @@ export default function InterviewPage() {
   const avatarStream = useAvatarStream(id);
 
   const isVideoMode = sessionMeta?.videoMode ?? false;
+  const coachEnabled = sessionMeta?.coachEnabled ?? true;
   const isMock = getMockMode();
+  const coach = useCoach(id, coachEnabled);
 
   // POST /start — once per mount pair (Strict Mode safe), or forced on retry
   const startInterview = useCallback(
@@ -161,6 +170,7 @@ export default function InterviewPage() {
             jobTitle: data.jobTitle,
             difficulty: data.difficulty,
             videoMode: data.videoMode ?? false,
+            coachEnabled: data.coachEnabled ?? true,
           });
         }
       } catch {
@@ -378,7 +388,65 @@ export default function InterviewPage() {
     }
   }, [webcam]);
 
-  // Keyboard shortcuts: Space toggles recording, R replays the question.
+  // Pause is a client-side hold: the server does nothing between answers, so
+  // nothing is spent. Allowed whenever the candidate is not mid-recording or
+  // waiting on the pipeline.
+  const canPause =
+    phase === "ready_to_record" ||
+    phase === "speaking" ||
+    phase === "transition" ||
+    phase === "stage_transition";
+
+  const pause = useCallback(() => {
+    if (!canPause) return;
+    if (phase === "speaking") {
+      playback.stop();
+      setPhase("ready_to_record");
+    }
+    setPaused(true);
+  }, [canPause, phase, playback]);
+
+  const resume = useCallback(() => {
+    setPaused(false);
+  }, []);
+
+  const togglePause = useCallback(() => {
+    if (paused) resume();
+    else pause();
+  }, [paused, pause, resume]);
+
+  const openCoach = useCallback(() => {
+    if (!coachEnabled) return;
+    if (!paused && canPause) pause();
+    setCoachOpen(true);
+  }, [coachEnabled, paused, canPause, pause]);
+
+  const handleExplain = useCallback(
+    (selection: string, source: "question" | "transcript") => {
+      if (!coachEnabled) return;
+      openCoach();
+      void coach.ask({
+        questionId: interview.currentQuestion?.questionId,
+        source,
+        selection,
+      });
+    },
+    [coachEnabled, openCoach, coach, interview.currentQuestion?.questionId],
+  );
+
+  const handleAskCoach = useCallback(
+    (prompt: string) => {
+      void coach.ask({
+        questionId: interview.currentQuestion?.questionId,
+        source: "free",
+        prompt,
+      });
+    },
+    [coach, interview.currentQuestion?.questionId],
+  );
+
+  // Keyboard shortcuts: Space toggles recording, R replays the question,
+  // P pauses / resumes, Escape closes the coach.
   // Ignored while typing in a field and while an answer is being processed.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -393,6 +461,22 @@ export default function InterviewPage() {
       ) {
         return;
       }
+
+      if (event.key === "Escape" && coachOpen) {
+        event.preventDefault();
+        setCoachOpen(false);
+        return;
+      }
+
+      if (event.key === "p" || event.key === "P") {
+        if (paused || canPause) {
+          event.preventDefault();
+          togglePause();
+        }
+        return;
+      }
+
+      if (paused) return;
 
       if (event.code === "Space") {
         if (phase === "ready_to_record") {
@@ -422,7 +506,7 @@ export default function InterviewPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, interview.audioUrl, interview.currentQuestion?.text, handleStartRecording, handleStopRecording]);
+  }, [phase, paused, canPause, coachOpen, togglePause, interview.audioUrl, interview.currentQuestion?.text, handleStartRecording, handleStopRecording]);
 
   // Derive avatar phase from interview phase
   const avatarPhase = (() => {
@@ -649,6 +733,37 @@ export default function InterviewPage() {
         questionOrder={interview.currentQuestion?.order || 0}
         questionTotal={interview.currentQuestion?.total || 0}
         isRecording={phase === "recording"}
+        paused={paused}
+        actions={
+          <div className="flex items-center gap-2">
+            {coachEnabled && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => (coachOpen ? setCoachOpen(false) : openCoach())}
+                aria-pressed={coachOpen}
+                className={coachOpen ? "bg-lavender text-lavender-deep" : undefined}
+                title={t.interview.coach.open}
+              >
+                <GraduationCap className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">{t.interview.coach.open}</span>
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant={paused ? "accent" : "outline"}
+              onClick={togglePause}
+              disabled={!paused && !canPause}
+              aria-pressed={paused}
+              title={paused ? t.interview.pause.resume : t.interview.pause.button}
+            >
+              {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+              <span className="hidden md:inline">
+                {paused ? t.interview.pause.resume : t.interview.pause.button}
+              </span>
+            </Button>
+          </div>
+        }
         progress={
           <ProgressBar
             current={interview.currentQuestion?.order || 0}
@@ -666,6 +781,15 @@ export default function InterviewPage() {
 
       {/* Errors */}
       {errorAlerts}
+
+      {/* Pause hold (inline so the question stays readable) */}
+      <PauseOverlay
+        open={paused}
+        coachEnabled={coachEnabled}
+        coachOpen={coachOpen}
+        onResume={resume}
+        onAskCoach={openCoach}
+      />
 
       {/* Stage transition (Full Loop mode) */}
       {interview.stageTransition && phase === "stage_transition" && (
@@ -688,14 +812,16 @@ export default function InterviewPage() {
 
       {/* Current question — keyed by id so each question pops in fresh */}
       {interview.currentQuestion && (
-        <QuestionCard
-          key={interview.currentQuestion.questionId}
-          text={interview.currentQuestion.text}
-          category={interview.currentQuestion.category}
-          order={interview.currentQuestion.order}
-          total={interview.currentQuestion.total}
-          isFollowUp={isFollowUp}
-        />
+        <div data-coach-source="question">
+          <QuestionCard
+            key={interview.currentQuestion.questionId}
+            text={interview.currentQuestion.text}
+            category={interview.currentQuestion.category}
+            order={interview.currentQuestion.order}
+            total={interview.currentQuestion.total}
+            isFollowUp={isFollowUp}
+          />
+        </div>
       )}
 
       {/* Audio waveform (hidden in video mode — avatar replaces it) */}
@@ -716,7 +842,7 @@ export default function InterviewPage() {
       {/* Record button — sticks to the bottom edge on small screens */}
       <div className="sticky bottom-0 z-20 -mx-4 flex flex-col items-center gap-3 bg-paper/85 px-4 py-3 backdrop-blur-md sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <RecordButton
-          phase={toRecordPhase(phase)}
+          phase={paused ? "idle" : toRecordPhase(phase)}
           audioLevel={recorder.audioLevel}
           duration={recorder.duration}
           onStart={handleStartRecording}
@@ -725,20 +851,44 @@ export default function InterviewPage() {
         <p className="hidden items-center justify-center gap-2 pb-2 text-[10px] text-muted-foreground sm:flex print:hidden">
           <span className="kbd">Space</span> {t.interview.shortcuts.record}
           <span className="kbd ml-2">R</span> {t.interview.shortcuts.replay}
+          <span className="kbd ml-2">P</span> {t.interview.shortcuts.pause}
         </p>
       </div>
 
       {/* Transcript preview + score tile */}
-      <TranscriptPreview
-        transcript={interview.transcript}
-        isProcessing={phase === "processing"}
-        score={interview.evaluation?.score}
-        tier={interview.evaluation?.tier}
-      />
+      <div data-coach-source="transcript">
+        <TranscriptPreview
+          transcript={interview.transcript}
+          isProcessing={phase === "processing"}
+          score={interview.evaluation?.score}
+          tier={interview.evaluation?.tier}
+        />
+      </div>
 
       {/* The interviewer's remark before the next question */}
       {interview.transitionMessage && phase === "transition" && (
         <TransitionCard message={interview.transitionMessage} />
+      )}
+
+      {coachEnabled && (
+        <>
+          <SelectionPopover
+            enabled={canPause || paused}
+            onExplain={handleExplain}
+          />
+          <CoachDrawer
+            open={coachOpen}
+            onClose={() => setCoachOpen(false)}
+            notes={coach.notes}
+            currentQuestionId={interview.currentQuestion?.questionId ?? null}
+            draft={coach.draft}
+            isStreaming={coach.isStreaming}
+            error={coach.error}
+            onAsk={handleAskCoach}
+            onCancel={coach.cancel}
+            modelLabel={isMock ? "mock" : (coach.model ?? "…")}
+          />
+        </>
       )}
     </>
   );
@@ -761,9 +911,11 @@ export default function InterviewPage() {
     );
   }
 
-  // Audio-only layout
+  // Audio-only layout (shifts left while the coach drawer is open on desktop)
   return (
-    <div className="container max-w-3xl py-6 sm:py-8">
+    <div
+      className={`container max-w-3xl py-6 transition-[padding] duration-300 ease-pop sm:py-8 ${coachOpen ? "sm:pr-[27rem] xl:pr-0 xl:-translate-x-[13rem]" : ""}`}
+    >
       <div className="space-y-5">
         {interviewControls}
       </div>

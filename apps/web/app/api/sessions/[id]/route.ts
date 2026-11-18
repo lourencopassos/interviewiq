@@ -42,6 +42,7 @@ export async function GET(
         interviewType: true,
         language: true,
         videoMode: true,
+        coachEnabled: true,
         status: true,
         currentIndex: true,
         _count: { select: { questions: true } },

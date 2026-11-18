@@ -80,6 +80,7 @@ export const interview: typeof En = {
   shortcuts: {
     record: "gravar · parar",
     replay: "repetir a pergunta",
+    pause: "pausar · retomar",
   },
   complete: {
     eyebrow: "Entrevista concluída",
@@ -126,6 +127,32 @@ export const interview: typeof En = {
     NO_QUESTION: "Nenhuma pergunta atual encontrada.",
     REPORT_FAILED:
       "Não foi possível gerar o seu relatório. Suas respostas estão salvas — você pode tentar de novo na página do relatório.",
+  },
+  pause: {
+    eyebrow: "respire fundo",
+    title: "Pausado",
+    body: "O entrevistador está esperando. Nada roda no servidor enquanto você está em pausa: o cronômetro para, a gravação fica desligada e você pode ler a pergunta com calma.",
+    noTokens: "nenhum token é gasto durante a pausa",
+    button: "Pausar",
+    resume: "Retomar",
+    askCoach: "Perguntar ao coach",
+  },
+  coach: {
+    title: "Coach",
+    eyebrow: "pergunte sobre esta pergunta",
+    open: "Coach",
+    close: "Fechar coach",
+    explainThis: "Explicar isto",
+    placeholder: "Pergunte sobre a pergunta ou sobre a sua resposta…",
+    send: "Perguntar",
+    cancel: "Parar",
+    thinking: "Pensando…",
+    empty: "Destaque um trecho da pergunta ou da sua resposta e escolha “Explicar isto”, ou digite uma pergunta abaixo.",
+    beforeAnswer: "perguntou antes de responder · marcado no relatório",
+    afterAnswer: "perguntou depois de responder",
+    otherQuestions: "Perguntas anteriores",
+    model: "modelo",
+    disabled: "O coach está desligado nesta sessão.",
   },
   errorPage: {
     eyebrow: "Sessão de entrevista",

@@ -22,6 +22,7 @@ export function StartInterviewButton() {
     interviewType,
     language,
     videoMode,
+    coachEnabled,
   } = useSetupStore();
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,7 @@ export function StartInterviewButton() {
           interviewType,
           language,
           videoMode,
+          coachEnabled,
           resumeText: resumeText || undefined,
           parsedJob: JSON.stringify(parsedJob),
           companyIntel: companyIntel ? JSON.stringify(companyIntel) : undefined,
@@ -82,6 +84,7 @@ export function StartInterviewButton() {
     language.replace(/_/g, "-"),
     videoMode ? t.setup.start.video : t.setup.start.audio,
     resumeText ? t.setup.start.withResume : null,
+    coachEnabled ? null : t.setup.start.coachOff,
   ].filter(Boolean);
 
   return (

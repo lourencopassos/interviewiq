@@ -7,7 +7,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import type { CoachingReport } from "@interviewiq/types";
+import type { CoachingReport, CoachNoteView } from "@interviewiq/types";
 import { interpolate, LOCALE_TAGS, useI18n, type Dictionary } from "@/lib/i18n";
 import { VerdictBanner } from "@/components/report/verdict-banner";
 import { DimensionScores } from "@/components/report/dimension-scores";
@@ -29,6 +29,8 @@ interface ReportData {
     status: string;
     /** Not part of the payload today; rendered in the title strip when present. */
     createdAt?: string;
+    /** Whether the in-interview coach was available. Older payloads omit it (treated as on). */
+    coachEnabled?: boolean;
   };
   questions: {
     id: string;
@@ -40,6 +42,8 @@ interface ReportData {
     feedback: string | null;
     strengths: string[];
     gaps: string[];
+    coachNotes?: CoachNoteView[];
+    coachedBeforeAnswer?: boolean;
   }[];
 }
 
@@ -323,6 +327,9 @@ export default function ReportPage() {
           <h1 className="mt-2 text-balance text-2xl sm:text-3xl">{session.jobTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {session.coachEnabled === false && (
+            <span className="pill bg-transparent text-muted-foreground">{t.report.coach.coachOff}</span>
+          )}
           {session.createdAt ? (
             <span className="pill bg-card tabular-nums">
               {formatDate(session.createdAt, localeTag)}
