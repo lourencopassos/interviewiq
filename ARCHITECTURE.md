@@ -154,6 +154,13 @@ CompanyResearch  cache of research results keyed by normalised company name
 
 JSON is stored as text columns on purpose: the shapes are owned by Zod schemas in `packages/types`, and the typed columns exist for list views and as a fallback if the JSON cannot be parsed.
 
+## Languages
+
+Two independent settings:
+
+- **Interview language** (`Session.language`: `EN`, `PT_BR`, `ES`) drives everything the candidate hears: every prompt receives a language instruction, Whisper gets the matching language code and prompt, ElevenLabs and D-ID use a voice for that language.
+- **Interface language** (`en`, `pt`, `es`) is a cookie read by the root layout. Dictionaries live in `apps/web/lib/i18n/dictionaries/<locale>/<namespace>.ts`; English is the typed source of truth and the other locales must provide the same keys. Server components read `getServerDictionary()`, client components `useI18n()`. Switching writes the cookie, updates client state and refreshes server components. The setup page defaults the interview language to the interface language on first visit.
+
 ## Identity and limits
 
 There is no authentication. A UUID generated in the browser (`clientId`) is stored with each session; listing, deleting and abandoning sessions require it, reading a session or report by id does not. Rate limits are a fixed window per client id or per session, kept in process memory.
