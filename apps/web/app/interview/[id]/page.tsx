@@ -193,6 +193,36 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVideoMode]);
 
+  // Ask the server for a D-ID offer when video mode has no live peer: on first
+  // load, after a reload, and (a couple of times) after a failure. Guarded by a
+  // timestamp so Strict Mode's double mount and quick re-renders ask only once.
+  const offerAttemptsRef = useRef(0);
+  const lastOfferAtRef = useRef(0);
+  useEffect(() => {
+    if (!isVideoMode || isMock) return;
+    if (avatarStream.isConnected) {
+      offerAttemptsRef.current = 0;
+      return;
+    }
+    const failed = Boolean(avatarStream.error) || interview.avatarFailed;
+    if (interview.avatarStreamData && !failed) return; // offer in hand, negotiating
+    if (offerAttemptsRef.current >= 4) return;
+    if (Date.now() - lastOfferAtRef.current < 4000) return;
+    // Back off after failures (e.g. D-ID's concurrent-stream quota needs idle streams to expire)
+    const delay = failed ? [5000, 15000, 45000, 90000][offerAttemptsRef.current] ?? 90000 : 0;
+    let fired = false;
+    const timer = setTimeout(() => {
+      fired = true;
+      lastOfferAtRef.current = Date.now();
+      offerAttemptsRef.current += 1;
+      void fetch(`/api/interview/${id}/avatar-offer`, { method: "POST" }).catch(() => {});
+    }, delay);
+    return () => {
+      if (!fired) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVideoMode, isMock, avatarStream.isConnected, avatarStream.error, interview.avatarFailed, interview.avatarStreamData, phase]);
+
   // Connect (or reconnect) the avatar whenever the server hands us a new offer.
   // Each `avatar_stream_ready` carries a fresh single-use stream id.
   const connectedStreamIdRef = useRef<string | null>(null);

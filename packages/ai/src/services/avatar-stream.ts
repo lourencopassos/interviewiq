@@ -100,7 +100,9 @@ export class AvatarStream {
     if (!response.ok) {
       const errorText = await response.text();
       throw new AvatarStreamError(
-        `D-ID create stream failed (${response.status}): ${errorText}`,
+        response.status === 403 && /max (user )?sessions/i.test(errorText)
+          ? "D-ID concurrent stream limit reached; earlier streams must expire before a new one can start."
+          : `D-ID create stream failed (${response.status}): ${errorText}`,
       );
     }
 
