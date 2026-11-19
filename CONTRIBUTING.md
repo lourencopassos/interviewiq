@@ -58,6 +58,13 @@ pnpm build
 
 Then fill in the PR template: what changed, how you tested it (mock mode or real keys, which interview type/language, video on or off, which browser), and screenshots for UI changes.
 
+## Review policy
+
+- `main` is protected: every change lands through a pull request, CI (lint, typecheck, tests, build) must pass, and force-pushes are blocked.
+- Only the maintainer can merge. CI on pull requests from forks runs only after the maintainer approves it, with a read-only token and no secrets.
+- Pull requests that touch CI (`.github/`), dependencies (`package.json`, `pnpm-lock.yaml`, `.npmrc`), the Docker setup, `middleware.ts` or `next.config.js` get a stricter review. Explain why a new dependency is needed and keep those changes in their own pull request.
+- Never commit API keys or `.env` files; secret scanning with push protection is enabled and will block the push.
+
 ## Reporting security issues
 
 Not in public issues, please. See [SECURITY.md](SECURITY.md).
