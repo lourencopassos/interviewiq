@@ -1,0 +1,16 @@
+# Every change is reviewed by the maintainer. GitHub requests a review from the
+# owner automatically on each pull request.
+*                       @lourencopassos
+
+# Supply chain and CI: changes here can run code in CI or ship code to users,
+# so they get extra scrutiny (see CONTRIBUTING.md "Review policy").
+/.github/               @lourencopassos
+/package.json           @lourencopassos
+/apps/*/package.json    @lourencopassos
+/packages/*/package.json @lourencopassos
+/pnpm-lock.yaml         @lourencopassos
+/.npmrc                 @lourencopassos
+/Dockerfile             @lourencopassos
+/docker-compose.yml     @lourencopassos
+/apps/web/middleware.ts @lourencopassos
+/apps/web/next.config.js @lourencopassos
