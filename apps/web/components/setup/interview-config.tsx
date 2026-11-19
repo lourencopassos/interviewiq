@@ -81,7 +81,7 @@ function OptionTiles<T extends string>({
   );
 }
 
-export function InterviewConfig() {
+export function InterviewConfig({ disabled }: { disabled: boolean }) {
   const { t, locale } = useI18n();
   const {
     difficulty,
@@ -90,9 +90,7 @@ export function InterviewConfig() {
     setDifficulty,
     setInterviewType,
     setLanguage,
-    step,
   } = useSetupStore();
-  const disabled = step !== "input" && step !== "error";
 
   // Once per mount: if the user hasn't picked a language yet, follow the UI
   // locale. The ref keeps this from ever running again (and overriding a choice).

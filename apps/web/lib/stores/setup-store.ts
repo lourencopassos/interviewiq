@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { draftKey, saveJob } from "@/lib/saved-jobs";
 import { getClientId } from "@/lib/client-id";
 import type {
   ParsedJob,
@@ -32,6 +33,8 @@ interface SetupStore {
   videoMode: boolean;
   coachEnabled: boolean;
 
+  storageError: boolean;
+
   // Flow state
   step: SetupStep;
   parsedJob: ParsedJob | null;
@@ -46,6 +49,8 @@ interface SetupStore {
   setLanguage: (l: Language) => void;
   setVideoMode: (v: boolean) => void;
   setCoachEnabled: (v: boolean) => void;
+  restored: boolean;
+  restoreJob: (job: { jobDescription: string; parsedJob: ParsedJob; companyIntel: CompanyIntelligence | null }) => void;
   analyzeJob: () => Promise<void>;
   clearAnalysis: () => void;
   reset: () => void;
@@ -60,6 +65,8 @@ const initialState = {
   videoMode: false,
   coachEnabled: true,
   step: "input" as SetupStep,
+  storageError: false,
+  restored: false,
   parsedJob: null,
   companyIntel: null,
   error: null,
@@ -68,7 +75,15 @@ const initialState = {
 export const useSetupStore = create<SetupStore>((set, get) => ({
   ...initialState,
 
-  setJobDescription: (text) => set({ jobDescription: text }),
+  setJobDescription: (text) => {
+    try {
+      if (text) localStorage.setItem(draftKey, text);
+      else localStorage.removeItem(draftKey);
+      set({ jobDescription: text, storageError: false });
+    } catch {
+      set({ jobDescription: text, storageError: true });
+    }
+  },
   setResumeText: (text) => set({ resumeText: text }),
   setDifficulty: (d) => set({ difficulty: d }),
   setInterviewType: (t) => set({ interviewType: t }),
@@ -76,12 +91,15 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   setVideoMode: (v) => set({ videoMode: v }),
   setCoachEnabled: (v) => set({ coachEnabled: v }),
 
+  restoreJob: ({ jobDescription, parsedJob, companyIntel }) =>
+    set({ jobDescription, parsedJob, companyIntel, restored: true, step: "ready", error: null }),
+
   analyzeJob: async () => {
     const { jobDescription } = get();
 
     try {
       // Step 1: Parse job description
-      set({ step: "parsing", error: null });
+      set({ step: "parsing", restored: false, error: null });
 
       const parseRes = await fetch("/api/parse-job", {
         method: "POST",
@@ -109,14 +127,14 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
         }),
       });
 
-      if (!researchRes.ok) {
-        // Company research failure is non-fatal — continue with null intel
-        set({ companyIntel: null, step: "ready" });
-        return;
+      const companyIntel: CompanyIntelligence | null = researchRes.ok ? await researchRes.json() : null;
+      let storageError = false;
+      try {
+        saveJob({ jobDescription, parsedJob, companyIntel });
+      } catch {
+        storageError = true;
       }
-
-      const companyIntel: CompanyIntelligence = await researchRes.json();
-      set({ companyIntel, step: "ready" });
+      set({ companyIntel, step: "ready", storageError });
     } catch (error) {
       const message =
         error instanceof TypeError
@@ -131,5 +149,8 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
   clearAnalysis: () =>
     set({ parsedJob: null, companyIntel: null, step: "input", error: null }),
 
-  reset: () => set(initialState),
+  reset: () => {
+    set(initialState);
+    get().setJobDescription("");
+  },
 }));
