@@ -4,12 +4,20 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: interviewiq
-      POSTGRES_PASSWORD: interviewiq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-interviewiq}
       POSTGRES_DB: interviewiq
     ports:
-      - "5436:5432"
+      # Loopback only: the database holds CVs and transcripts and must not be
+      # reachable from the local network. Host port 5436 avoids clashing with a
+      # Postgres already running on 5432.
+      - "127.0.0.1:5436:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interviewiq -d interviewiq"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
 
 volumes:
   pgdata:

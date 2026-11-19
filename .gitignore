@@ -8,14 +8,16 @@ dist/
 .turbo/
 out/
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Environment (keys and connection strings never get committed)
+.env*
+!.env.example
+!**/.env.example
 
-# Database
+# Database files and dumps (may contain CVs and transcripts)
 *.db
 *.db-journal
+*.sql
+*.dump
 
 # IDE
 .vscode/
@@ -30,9 +32,11 @@ Thumbs.db
 # Claude Code
 .claude-memory
 
-# Debug
+# Logs and coverage
+*.log
 npm-debug.log*
 pnpm-debug.log*
+coverage/
 
 # Working notes
 FIXES.md

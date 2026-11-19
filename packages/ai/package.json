@@ -7,6 +7,10 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --require tsx/cjs --test test/*.test.cjs"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@interviewiq/db": "workspace:*",

@@ -11,11 +11,11 @@
     "db:up": "docker compose -f ../../docker-compose.yml up -d",
     "db:down": "docker compose -f ../../docker-compose.yml down",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "generate": "prisma generate",
     "postinstall": "prisma generate",
-    "studio": "prisma studio"
+    "studio": "prisma studio",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0"
