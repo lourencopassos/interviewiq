@@ -7,19 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Interview engine split into focused modules (session and question repositories, prompt context, question planner, event builders, avatar relay, report builder).
-- One typed SSE event contract shared by server and client, validated with zod; Full Loop stages travel as enums.
-- One error model: every API error is `{ error: { code, message, retryable } }`, localized on the client by code.
-- Interview page driven by a pure, unit-tested phase machine; no lint suppressions left in the interview flow.
-- Server fallback copy (opening, closing, feedback, narration) localized for EN, PT-BR and ES.
-- Anthropic SDK 1.10 with the typed web search tool.
-
-### Added
-- Production Docker image and an opt-in `app` compose profile (localhost only).
-- 147 tests across the interview engine, phase machine, API client, report service, SSE emitter and i18n parity.
-- README screenshots.
-
 ## [0.1.0] - 2026-11-19
 
 First public release: a self-hosted, single-user, bring-your-own-keys AI mock interview app.
@@ -40,6 +27,8 @@ First public release: a self-hosted, single-user, bring-your-own-keys AI mock in
 - **Mock mode** for development: the whole flow runs on fixtures with no API keys and no spend.
 - **Design system:** a warm "paper" visual language with motion.
 - Configurable models (`CLAUDE_MODEL`, `COACH_MODEL`), a sample interview seed, and a local Postgres via Docker Compose.
+- **Run with Docker:** a production image and an opt-in `app` compose profile (localhost only, keys passed at runtime).
+- **147 tests** across the interview engine, interview phase machine, API client, report service, SSE emitter and translation parity, run in CI with lint, typecheck and build.
 
 ### Security
 
@@ -53,7 +42,8 @@ First public release: a self-hosted, single-user, bring-your-own-keys AI mock in
 
 - Question sets are generated through structured tool output, and the answer evaluator was tuned for more consistent scores.
 - The D-ID avatar stays connected across reconnects and requests stream offers only on demand, to stay within the stream quota.
-- Upgraded Next.js to 15.5.29; Node.js 20.19 or newer is required.
+- Upgraded Next.js to 15.5.29 and the Anthropic SDK to 1.10; Node.js 20.19 or newer is required.
+- One typed contract for live events and API errors, shared by server and browser; errors are shown in your interface language.
 
 [Unreleased]: https://github.com/lourencopassos/interviewiq/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/lourencopassos/interviewiq/releases/tag/v0.1.0
