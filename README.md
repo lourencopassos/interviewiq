@@ -2,6 +2,22 @@
 
 AI mock interviews you run on your own machine.
 
+[![CI](https://github.com/lourencopassos/interviewiq/actions/workflows/ci.yml/badge.svg)](https://github.com/lourencopassos/interviewiq/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+![InterviewIQ landing page](docs/screenshots/landing.jpg)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/interview-coach.jpg" alt="Live interview paused, with the coach explaining a highlighted part of a follow-up question" /></td>
+    <td width="50%"><img src="docs/screenshots/report.jpg" alt="Coaching report with verdict, dimension scores and summary" /></td>
+  </tr>
+  <tr>
+    <td><sub>Pause any time and ask the coach about the question or your answer.</sub></td>
+    <td><sub>A coaching report with a verdict, four scores and a study plan.</sub></td>
+  </tr>
+</table>
+
 **Who this is for:** job seekers practising tech interviews in English, Portuguese or Spanish. It is a practice tool, not an assessment: scores are an AI's opinion meant to point you at what to study.
 
 Paste a job description. InterviewIQ parses it, researches the company, and runs an adaptive **voice interview**: an AI interviewer asks questions out loud, you answer with your microphone, each answer is scored in real time, and weak answers get follow-ups. At the end you get a coaching report with dimension scores, strengths, gaps, a prioritized study plan, and tips for the real thing.

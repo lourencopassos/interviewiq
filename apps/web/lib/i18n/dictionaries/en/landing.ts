@@ -20,7 +20,7 @@ export const landing = {
     demoCaption: "A scripted preview. Real sessions run on your keys.",
   },
   demo: {
-    live: "Live · Senior Frontend · Stripe",
+    live: "Live · Senior Frontend · Northwind Labs",
     interviewer: "Interviewer",
     you: "you",
     followUp: "follow-up",
@@ -33,7 +33,7 @@ export const landing = {
     rule: "score < 65 → follow-up",
     script: [
       {
-        question: "Stripe's dashboard renders thousands of rows. Where does React start to hurt, and what would you reach for first?",
+        question: "Northwind's analytics dashboard renders thousands of rows. Where does React start to hurt, and what would you reach for first?",
         feedback: "Good instinct to measure before memoizing.",
       },
       {

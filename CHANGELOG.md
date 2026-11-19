@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Architecture refactor: orchestrator split, typed event contract, unified errors (in progress).
+### Changed
+- Interview engine split into focused modules (session and question repositories, prompt context, question planner, event builders, avatar relay, report builder).
+- One typed SSE event contract shared by server and client, validated with zod; Full Loop stages travel as enums.
+- One error model: every API error is `{ error: { code, message, retryable } }`, localized on the client by code.
+- Interview page driven by a pure, unit-tested phase machine; no lint suppressions left in the interview flow.
+- Server fallback copy (opening, closing, feedback, narration) localized for EN, PT-BR and ES.
+- Anthropic SDK 1.10 with the typed web search tool.
+
+### Added
+- Production Docker image and an opt-in `app` compose profile (localhost only).
+- 147 tests across the interview engine, phase machine, API client, report service, SSE emitter and i18n parity.
+- README screenshots.
 
 ## [0.1.0] - 2026-11-19
 
