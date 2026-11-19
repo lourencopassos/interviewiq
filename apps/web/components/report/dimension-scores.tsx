@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { CoachingReport } from "@interviewiq/types";
 import { useI18n } from "@/lib/i18n";
-import { scoreTone, toneStyles } from "./score-tone";
+import { scoreTone, toneStyles } from "@/lib/score";
 
 interface DimensionScoresProps {
   overallScore: number;

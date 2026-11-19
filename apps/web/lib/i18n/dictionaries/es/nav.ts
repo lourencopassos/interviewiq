@@ -4,5 +4,6 @@ export const nav: typeof En = {
   home: "Inicio de InterviewIQ",
   practice: "Practicar",
   history: "Historial",
+  primary: "Principal",
   local: "Local · tus claves",
 };

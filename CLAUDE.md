@@ -49,12 +49,16 @@ packages/ai/src/
   client.ts                 Claude wrapper (retries, fence stripping, model config)
   prompts/                  job-parser, company-research, question-generator, answer-evaluator,
                             report-generator, stage-narrator, coach-explainer (+ language, recover helpers)
-  services/                 interview-orchestrator (+ globalThis registry), adaptive-engine,
-                            audio-pipeline, avatar-stream, coach-service, company-research-service, report-service
+  interview/                orchestrator (state machine), registry (globalThis), session- and question-repository,
+                            prompt-context, question-planner, events (SSE builders), avatar-relay, report-builder
+  services/                 adaptive-engine, audio-pipeline, avatar-stream, coach-service,
+                            company-research-service, report-service, session-service
+  errors.ts                 AppError (code, status, retryable) + MissingApiKeyError, toAppError
+  i18n/fallbacks.ts         server fallback copy per interview language
   cache/tts-cache.ts        pre-fetched clips + blob store
   sse/emitter.ts            Map<sessionId, controller>, globalThis singleton
   mock/                     fixtures for mock mode
-packages/types/src/         Zod schemas, enums, SSE event union (events.ts)
+packages/types/src/         Zod schemas, enums, SSE event schema (events.ts), ErrorCode + ApiErrorBody (errors.ts)
 packages/db/                Prisma schema, client singleton, seed
 docs/                       design-system.md, FEATURES.md, history/
 ```

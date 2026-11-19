@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { ApiErrorBody } from "@interviewiq/types";
 
 /**
  * Cross-site request protection for the API.
@@ -20,8 +21,10 @@ export const config = { matcher: "/api/:path*" };
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ANSWER_ROUTE = /^\/api\/interview\/[^/]+\/answer\/?$/;
 
-function reject(status: number, code: string, error: string) {
-  return NextResponse.json({ error, code }, { status });
+/** Same envelope as `apiError` (lib/api-response.ts), built here without the Node-only service layer. */
+function reject(status: 403 | 415, code: "CROSS_SITE" | "UNSUPPORTED_MEDIA_TYPE", message: string) {
+  const body: ApiErrorBody = { error: { code, message, retryable: false } };
+  return NextResponse.json(body, { status });
 }
 
 function hasBody(request: NextRequest): boolean {

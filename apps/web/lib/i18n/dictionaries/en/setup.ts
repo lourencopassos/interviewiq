@@ -47,11 +47,6 @@ export const setup = {
       research: "Research the company",
       ready: "Ready to start",
     },
-    errors: {
-      network: "Network error — please check your connection",
-      parseFailed: "Failed to parse job description",
-      unknown: "Something went wrong",
-    },
   },
   preview: {
     parsed: "parsed",
@@ -108,11 +103,6 @@ export const setup = {
     permissionMic: "You'll be asked for microphone access on the next screen.",
     permissionMicCamera: "You'll be asked for microphone and camera access on the next screen.",
     failedTitle: "Could not start the interview",
-    errors: {
-      network: "Network error — please check your connection and try again",
-      createFailed: "Failed to create session ({status})",
-      unknown: "Failed to create session",
-    },
   },
   startOver: "Start over with a different posting",
 };

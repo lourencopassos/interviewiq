@@ -8,6 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSetupStore } from "@/lib/stores/setup-store";
 import { useI18n, interpolate } from "@/lib/i18n";
 import { getClientId } from "@/lib/client-id";
+import { apiFetch } from "@/lib/api-client";
+import { describeError, toUiError, type UiError } from "@/lib/errors";
 
 export function StartInterviewButton() {
   const router = useRouter();
@@ -25,7 +27,7 @@ export function StartInterviewButton() {
     coachEnabled,
   } = useSetupStore();
   const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
 
   if (step !== "ready" || !parsedJob) return null;
 
@@ -34,10 +36,9 @@ export function StartInterviewButton() {
     setError(null);
 
     try {
-      const res = await fetch("/api/sessions", {
+      const session = await apiFetch<{ id: string }>("/api/sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           clientId: getClientId(),
           jobTitle: parsedJob.jobTitle,
           companyName: parsedJob.companyName,
@@ -50,29 +51,12 @@ export function StartInterviewButton() {
           resumeText: resumeText || undefined,
           parsedJob: JSON.stringify(parsedJob),
           companyIntel: companyIntel ? JSON.stringify(companyIntel) : undefined,
-        }),
+        },
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          typeof data?.error === "string"
-            ? data.error
-            : interpolate(t.setup.start.errors.createFailed, { status: res.status }),
-        );
-      }
-
-      const session = await res.json();
       router.push(`/interview/${session.id}`);
     } catch (err) {
       console.error("Failed to start interview:", err);
-      setError(
-        err instanceof TypeError
-          ? t.setup.start.errors.network
-          : err instanceof Error
-            ? err.message
-            : t.setup.start.errors.unknown,
-      );
+      setError(toUiError(err));
       setIsCreating(false);
     }
   };
@@ -93,7 +77,7 @@ export function StartInterviewButton() {
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>{t.setup.start.failedTitle}</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{describeError(t, error)}</AlertDescription>
         </Alert>
       )}
 

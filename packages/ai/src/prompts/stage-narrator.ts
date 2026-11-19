@@ -1,6 +1,13 @@
-import type { Language } from "@interviewiq/types";
+import { FULL_LOOP_STAGES, type InterviewStage, type Language } from "@interviewiq/types";
 import { callClaudePlainText } from "../client";
 import { languageInstruction } from "./language";
+import { fallbacksFor } from "../i18n/fallbacks";
+import { getMockStageTransition } from "../mock/fixtures/stage-transition";
+
+/** English stage name for the prompt; the model writes the narration in the session language. */
+function promptStageName(stage: InterviewStage): string {
+  return FULL_LOOP_STAGES.find((s) => s.stage === stage)?.label ?? stage;
+}
 
 function buildSystemPrompt(params: {
   companyName: string;
@@ -38,28 +45,30 @@ Return ONLY the transition text. No JSON, no quotes, no formatting. This will be
 export async function generateStageTransition(params: {
   companyName: string;
   jobTitle: string;
-  completedStageLabel: string;
+  completedStage: InterviewStage;
   completedStageScore: number;
-  nextStageLabel: string;
+  nextStage: InterviewStage;
   language?: Language;
 }): Promise<string> {
   try {
-    const text = await callClaudePlainText(
+    return await callClaudePlainText(
       buildSystemPrompt({
         companyName: params.companyName,
         jobTitle: params.jobTitle,
-        completedStage: params.completedStageLabel,
+        completedStage: promptStageName(params.completedStage),
         completedStageScore: params.completedStageScore,
-        nextStage: params.nextStageLabel,
+        nextStage: promptStageName(params.nextStage),
         language: params.language,
       }),
       "Generate the stage transition narration.",
-      { maxTokens: 256 },
+      { maxTokens: 256, mockText: getMockStageTransition(params.completedStage, params.nextStage) },
     );
-
-    return text;
   } catch (error) {
     console.error("Stage transition generation failed:", error);
-    return `Great, we've wrapped up the ${params.completedStageLabel} portion. Let's move on to ${params.nextStageLabel}.`;
+    const fallback = fallbacksFor(params.language);
+    return fallback.stageTransition(
+      fallback.stageNames[params.completedStage],
+      fallback.stageNames[params.nextStage],
+    );
   }
 }

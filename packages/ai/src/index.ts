@@ -8,7 +8,13 @@ export {
   COACH_MODEL,
 } from "./client";
 export { runWithMockMode, isMockMode } from "./mock";
-export { MissingApiKeyError, type ApiKeyProvider } from "./errors";
+export {
+  AppError,
+  MissingApiKeyError,
+  toAppError,
+  type AppErrorOptions,
+  type ApiKeyProvider,
+} from "./errors";
 export { parseJobDescription } from "./prompts/job-parser";
 export { researchCompany } from "./prompts/company-research";
 export { generateQuestionSet } from "./prompts/question-generator";
@@ -17,11 +23,20 @@ export { generateCoachingReport } from "./prompts/report-generator";
 export { generateStageTransition } from "./prompts/stage-narrator";
 export {
   InterviewOrchestrator,
-  OrchestratorError,
   getOrCreateOrchestrator,
   destroyOrchestrator,
-} from "./services/interview-orchestrator";
-export { getReportPayload, verdictForScore } from "./services/report-service";
+  type StartOutcome,
+} from "./interview";
+export { ensureReport, getReportPayload, verdictForScore } from "./services/report-service";
+export {
+  createSession,
+  getSessionSummary,
+  listSessions,
+  abandonSession,
+  deleteSession,
+  deleteClientSessions,
+  type SessionFilters,
+} from "./services/session-service";
 export { streamCoachAnswer, listCoachNotes } from "./services/coach-service";
 export type { ReportPayload, ReportQuestionView, ReportSessionView } from "./services/report-service";
 export {

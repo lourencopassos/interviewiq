@@ -5,6 +5,7 @@ import { GraduationCap, Quote, Send, Square, X } from "lucide-react";
 import type { CoachNoteView, CoachRequest } from "@interviewiq/types";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
+import { describeError, type UiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 
 interface CoachDrawerProps {
@@ -14,7 +15,7 @@ interface CoachDrawerProps {
   currentQuestionId: string | null;
   draft: { request: CoachRequest; text: string } | null;
   isStreaming: boolean;
-  error: { code: string; message: string } | null;
+  error: UiError | null;
   onAsk: (prompt: string) => void;
   onCancel: () => void;
   modelLabel: string;
@@ -69,7 +70,17 @@ function inline(text: string) {
   });
 }
 
-function NoteCard({ note, label }: { note: CoachNoteView; label: string }) {
+/**
+ * The line above a coach answer: the candidate's own question, or "Explain this"
+ * for a highlighted passage (the server stores a fixed prompt for those).
+ */
+function askedLine(request: { source: CoachNoteView["source"]; selection?: string | null; prompt?: string }, explainLabel: string) {
+  if (request.source !== "free" && request.selection) return explainLabel;
+  return request.prompt || null;
+}
+
+function NoteCard({ note, label, explainLabel }: { note: CoachNoteView; label: string; explainLabel: string }) {
+  const asked = askedLine(note, explainLabel);
   return (
     <article className="tile p-4 animate-pop-in">
       {note.selection && (
@@ -78,12 +89,7 @@ function NoteCard({ note, label }: { note: CoachNoteView; label: string }) {
           <span className="line-clamp-4">{note.selection}</span>
         </blockquote>
       )}
-      {note.prompt && !note.selection && (
-        <p className="mb-2 text-[13px] font-semibold text-ink">{note.prompt}</p>
-      )}
-      {note.prompt && note.selection && note.prompt !== "Explain this" && (
-        <p className="mb-2 text-[13px] font-semibold text-ink">{note.prompt}</p>
-      )}
+      {asked && <p className="mb-2 text-[13px] font-semibold text-ink">{asked}</p>}
       <AnswerText text={note.answer} />
       <p className="mt-3 flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
         <span className={cn("led", note.askedBeforeAnswer ? "bg-butter-deep text-butter-deep/40" : "bg-sage-deep text-sage-deep/40")} aria-hidden />
@@ -113,6 +119,7 @@ export function CoachDrawer({
 
   const current = notes.filter((n) => n.questionId === currentQuestionId);
   const earlier = notes.filter((n) => n.questionId !== currentQuestionId);
+  const draftAsked = draft ? askedLine(draft.request, C.explainThis) : null;
 
   // Keep the newest content in view while streaming
   useEffect(() => {
@@ -164,7 +171,12 @@ export function CoachDrawer({
             <p className="sheet px-4 py-5 text-center text-[12px] text-muted-foreground">{C.empty}</p>
           )}
           {current.map((n) => (
-            <NoteCard key={n.id} note={n} label={n.askedBeforeAnswer ? C.beforeAnswer : C.afterAnswer} />
+            <NoteCard
+              key={n.id}
+              note={n}
+              label={n.askedBeforeAnswer ? C.beforeAnswer : C.afterAnswer}
+              explainLabel={C.explainThis}
+            />
           ))}
 
           {draft && (
@@ -175,9 +187,7 @@ export function CoachDrawer({
                   <span className="line-clamp-4">{draft.request.selection}</span>
                 </blockquote>
               )}
-              {draft.request.prompt && (
-                <p className="mb-2 text-[13px] font-semibold text-ink">{draft.request.prompt}</p>
-              )}
+              {draftAsked && <p className="mb-2 text-[13px] font-semibold text-ink">{draftAsked}</p>}
               {draft.text ? (
                 <AnswerText text={draft.text} />
               ) : (
@@ -194,7 +204,7 @@ export function CoachDrawer({
 
           {error && (
             <p className="rounded-md border-1.5 border-ink bg-blush px-3 py-2 text-[12px] text-blush-deep">
-              {error.message}
+              {describeError(t, error)}
             </p>
           )}
 
@@ -205,7 +215,12 @@ export function CoachDrawer({
               </summary>
               <div className="mt-3 space-y-3">
                 {earlier.map((n) => (
-                  <NoteCard key={n.id} note={n} label={n.askedBeforeAnswer ? C.beforeAnswer : C.afterAnswer} />
+                  <NoteCard
+              key={n.id}
+              note={n}
+              label={n.askedBeforeAnswer ? C.beforeAnswer : C.afterAnswer}
+              explainLabel={C.explainThis}
+            />
                 ))}
               </div>
             </details>

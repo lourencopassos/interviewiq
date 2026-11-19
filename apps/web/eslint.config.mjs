@@ -28,8 +28,9 @@ const eslintConfig = [
     },
   },
   {
-    // CommonJS config files (next.config.js, postcss.config.js) must use require()
-    files: ["*.config.js", "*.config.cjs"],
+    // CommonJS config files (next.config.js, postcss.config.js) and the Node
+    // test files (test/*.test.cjs, which load the TS sources via tsx) use require()
+    files: ["*.config.js", "*.config.cjs", "test/**/*.cjs"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },

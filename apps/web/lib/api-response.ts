@@ -1,38 +1,42 @@
 import { NextResponse } from "next/server";
-import { MissingApiKeyError, OrchestratorError } from "@interviewiq/ai";
+import { AppError, MissingApiKeyError, toAppError } from "@interviewiq/ai";
+import { isErrorCode, type ApiErrorBody, type ErrorCode } from "@interviewiq/types";
 
-/** JSON error body every API route uses: a stable `code`, a safe `error` message. */
-export function jsonError(
-  status: number,
-  code: string,
-  error: string,
-  extra: Record<string, unknown> = {},
-) {
-  return NextResponse.json({ error, code, ...extra }, { status });
+interface ApiErrorOptions {
+  /** Code for anything that is not already an AppError. Defaults to INTERNAL_ERROR. */
+  fallback?: ErrorCode;
+  /** Log context, e.g. "Answer submission failed". Server errors log the cause; client errors a one-line warning. */
+  log?: string;
+  headers?: HeadersInit;
 }
 
-export function missingApiKeyResponse(error: MissingApiKeyError) {
-  return jsonError(503, error.code, error.message, { provider: error.provider, retryable: false });
+/** A successful JSON response. */
+export function apiOk<T>(data: T, init?: ResponseInit): NextResponse<T> {
+  return NextResponse.json(data, init);
 }
 
 /**
- * Map a thrown error to a response without leaking provider details:
- * - MissingApiKeyError → 503 MISSING_API_KEY with the env var to set
- * - OrchestratorError  → its status, code and (fixed, server-authored) message
- * - anything else      → the caller's generic fallback
- * The caller is responsible for logging the original error.
+ * The error response every route returns: `{ error: { code, message, retryable, provider? } }`
+ * with the status that belongs to the code. Pass an ErrorCode for a known
+ * condition, or whatever was thrown: AppErrors keep their code, a provider 429
+ * becomes UPSTREAM_RATE_LIMITED, anything else becomes `fallback` so provider
+ * details never reach the client.
  */
-export function errorResponse(
-  error: unknown,
-  fallback: { status: number; code: string; error: string; retryable?: boolean },
-) {
-  if (error instanceof MissingApiKeyError) return missingApiKeyResponse(error);
-  if (error instanceof OrchestratorError) {
-    return jsonError(error.httpStatus, error.code, error.message, {
-      retryable: error.httpStatus >= 500,
-    });
+export function apiError(error: ErrorCode | unknown, options: ApiErrorOptions = {}): NextResponse<ApiErrorBody> {
+  const appError = isErrorCode(error) ? new AppError(error) : toAppError(error, options.fallback);
+
+  if (options.log) {
+    if (appError.status >= 500) console.error(`${options.log}:`, error);
+    else console.warn(`${options.log} (${appError.code})`, appError.details ?? "");
   }
-  return jsonError(fallback.status, fallback.code, fallback.error, {
-    retryable: fallback.retryable ?? true,
-  });
+
+  const body: ApiErrorBody = {
+    error: {
+      code: appError.code,
+      message: appError.message,
+      retryable: appError.retryable,
+      ...(appError instanceof MissingApiKeyError && { provider: appError.provider }),
+    },
+  };
+  return NextResponse.json(body, { status: appError.status, headers: options.headers });
 }

@@ -19,5 +19,60 @@ services:
       timeout: 5s
       retries: 15
 
+  # -------------------------------------------------------------------------
+  # Production container (opt-in): `docker compose --profile app up -d --build`
+  # Plain `docker compose up` still starts only the database for local dev.
+  # -------------------------------------------------------------------------
+
+  # One-shot schema push; the app starts only after it exits successfully.
+  migrate:
+    profiles: ["app"]
+    build:
+      context: .
+      target: migrate
+    image: interviewiq-migrate:latest
+    environment:
+      DATABASE_URL: postgresql://interviewiq:${POSTGRES_PASSWORD:-interviewiq}@db:5432/interviewiq
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runner
+    image: interviewiq:latest
+    restart: unless-stopped
+    # API keys and optional settings come from the environment at runtime and
+    # are never baked into the image. Pass your env file explicitly:
+    #   docker compose --env-file apps/web/.env.local --profile app up -d --build
+    # (Using --env-file instead of env_file keeps plain `docker compose up`
+    # working for the database even when apps/web/.env.local does not exist.)
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-}
+      COACH_MODEL: ${COACH_MODEL:-}
+      ELEVENLABS_VOICE_EN: ${ELEVENLABS_VOICE_EN:-}
+      ELEVENLABS_VOICE_PT_BR: ${ELEVENLABS_VOICE_PT_BR:-}
+      ELEVENLABS_VOICE_ES: ${ELEVENLABS_VOICE_ES:-}
+      DID_API_KEY: ${DID_API_KEY:-}
+      DID_PRESENTER_URL: ${DID_PRESENTER_URL:-}
+      # Inside the compose network the database is `db` on its internal port
+      # (overrides the localhost:5436 URL from .env.local).
+      DATABASE_URL: postgresql://interviewiq:${POSTGRES_PASSWORD:-interviewiq}@db:5432/interviewiq
+    ports:
+      # Loopback only, like the database. There is no login: do not publish
+      # this on 0.0.0.0 without an authenticating reverse proxy in front.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
 volumes:
   pgdata:

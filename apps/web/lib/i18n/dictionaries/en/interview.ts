@@ -33,12 +33,6 @@ export const interview = {
   question: {
     eyebrow: "Interviewer · question {order} of {total}",
     followUp: "follow-up",
-    category: {
-      technical: "Technical",
-      behavioral: "Behavioral",
-      system_design: "System design",
-      culture_fit: "Culture fit",
-    },
   },
   record: {
     ready: "Record answer",
@@ -98,11 +92,11 @@ export const interview = {
       title: "Could not start the interview",
       retrying: "Retrying…",
       back: "Back to setup",
+      notFound: "This interview doesn't exist, or it was started in another browser.",
     },
     submit: {
       title: "Your answer was not submitted",
       retryUpload: "Retry upload",
-      retrying: "Retrying…",
       recordAgain: "Record again",
     },
     mic: {
@@ -112,31 +106,6 @@ export const interview = {
     recording: {
       title: "Recording problem",
     },
-  },
-  /** Client-side failure copy. */
-  errors: {
-    network: "Network error — please check your connection",
-    startFailed: "Failed to start interview",
-    notFound: "This interview doesn't exist, or it was started in another browser.",
-    startFailedStatus: "Failed to start interview ({status})",
-    submitFailed: "Failed to submit your answer",
-    uploadNetwork: "Network error — could not upload your answer",
-    recordStartFailed: "Could not start recording",
-    recordFailed: "Recording failed — please try again",
-    noMicrophone: "No microphone was found. Connect one and try again.",
-  },
-  /** Server `error` events with a known code; unknown codes show the server message. */
-  serverErrors: {
-    AUDIO_UNAVAILABLE:
-      "Audio couldn't be generated for this question. Please read it and record your answer.",
-    NO_QUESTION: "No current question found.",
-    REPORT_FAILED:
-      "We couldn't generate your report. Your answers are saved — you can retry from the report page.",
-    START_FAILED: "Failed to start the interview. Please try again.",
-    COACH_FAILED: "The coach is unavailable right now.",
-    AVATAR_UNAVAILABLE: "The video interviewer is unavailable. Continuing with audio.",
-    AVATAR_QUOTA: "The video service is at its concurrent stream limit. Continuing with audio.",
-    AVATAR_NO_CREDITS: "The video service account has no credits left. Continuing with audio.",
   },
   stop: {
     button: "Stop interview",

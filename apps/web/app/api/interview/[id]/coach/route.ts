@@ -1,15 +1,13 @@
-import { NextResponse } from "next/server";
 import { assertOwner } from "@/lib/session-owner";
-import { listCoachNotes, streamCoachAnswer, MissingApiKeyError, OrchestratorError, COACH_MODEL } from "@interviewiq/ai";
-import { coachRequestSchema, type CoachStreamEvent } from "@interviewiq/types";
+import { listCoachNotes, streamCoachAnswer, toAppError, COACH_MODEL } from "@interviewiq/ai";
+import { coachRequestSchema, type CoachNoteView, type CoachStreamEvent } from "@interviewiq/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { readJson } from "@/lib/http";
-import { errorResponse, jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 export const dynamic = "force-dynamic";
 
-const COACH_FAILED_MESSAGE = "The coach is unavailable right now";
 const encoder = new TextEncoder();
 const line = (event: CoachStreamEvent) => encoder.encode(JSON.stringify(event) + "\n");
 
@@ -21,7 +19,7 @@ export async function GET(
   const { id } = await params;
   const owner = await assertOwner(id, request);
   if (!owner.ok) return owner.response;
-  return NextResponse.json({ notes: await listCoachNotes(id), model: COACH_MODEL });
+  return apiOk({ notes: await listCoachNotes(id), model: COACH_MODEL });
 }
 
 /**
@@ -43,9 +41,7 @@ export async function POST(
     if (!rl.allowed) return rateLimitResponse(rl);
 
     const parsed = coachRequestSchema.safeParse(await readJson(request));
-    if (!parsed.success) {
-      return jsonError(400, "INVALID_REQUEST", "Invalid request", { details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return apiError("INVALID_REQUEST");
 
     const cancellation = new AbortController();
     const signal = AbortSignal.any([request.signal, cancellation.signal]);
@@ -53,13 +49,12 @@ export async function POST(
 
     // Resolve the first chunk before committing to a 200 so validation errors
     // (no session, coach off, not interviewing) come back as proper statuses.
-    let first: IteratorResult<string, Awaited<ReturnType<typeof listCoachNotes>>[number]>;
+    let first: IteratorResult<string, CoachNoteView>;
     try {
       first = await generator.next();
     } catch (error) {
       if (signal.aborted) return new Response(null, { status: 499 });
-      if (!(error instanceof OrchestratorError)) console.error("Coach request failed:", error);
-      return errorResponse(error, { status: 502, code: "COACH_FAILED", error: COACH_FAILED_MESSAGE });
+      return apiError(error, { fallback: "COACH_FAILED", log: "Coach request failed" });
     }
 
     const stream = new ReadableStream({
@@ -75,13 +70,8 @@ export async function POST(
           if (signal.aborted) return;
           console.error("Coach stream failed:", error);
           // Fixed copy only; the provider's error text stays in the log above.
-          controller.enqueue(
-            line(
-              error instanceof OrchestratorError || error instanceof MissingApiKeyError
-                ? { type: "error", code: error.code, message: error.message }
-                : { type: "error", code: "COACH_FAILED", message: COACH_FAILED_MESSAGE },
-            ),
-          );
+          const { code, message } = toAppError(error, "COACH_FAILED");
+          controller.enqueue(line({ type: "error", code, message }));
         } finally {
           if (!cancellation.signal.aborted) controller.close();
         }

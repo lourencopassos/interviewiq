@@ -1,10 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
+import type { ContentBlock, Tool, WebSearchTool20260209 } from "@anthropic-ai/sdk/resources/messages";
 import { isMockMode, delay } from "./mock";
 import { mockIntroduction, mockQuestionSet } from "./mock/fixtures/question-set";
 import { getNextMockEvaluation } from "./mock/fixtures/evaluation";
 import { mockCoachingReport } from "./mock/fixtures/report";
-import { getMockStageTransition } from "./mock/fixtures/stage-transition";
 import { requireApiKey } from "./errors";
 
 /**
@@ -44,7 +43,7 @@ const MAX_RATE_LIMIT_WAIT_MS = 60_000;
 
 function isRetryable(error: unknown): { retry: boolean; waitMs: number } {
   if (error instanceof Anthropic.RateLimitError) {
-    const retryAfter = error.headers?.["retry-after"];
+    const retryAfter = error.headers?.get("retry-after");
     const parsed = retryAfter ? parseInt(retryAfter, 10) : NaN;
     const waitMs = Number.isFinite(parsed)
       ? Math.min(parsed * 1000, MAX_RATE_LIMIT_WAIT_MS)
@@ -123,7 +122,7 @@ function cleanJsonResponse(text: string): string {
 export async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  options?: { maxTokens?: number; tool?: Anthropic.Messages.Tool },
+  options?: { maxTokens?: number; tool?: Tool },
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(300);
@@ -167,6 +166,12 @@ export async function callClaude(
   }
 }
 
+const WEB_SEARCH_TOOL: WebSearchTool20260209 = {
+  type: "web_search_20260209",
+  name: "web_search",
+  max_uses: 5,
+};
+
 export async function callClaudeWithSearch(
   systemPrompt: string,
   userMessage: string,
@@ -182,13 +187,7 @@ export async function callClaudeWithSearch(
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
-      tools: [
-        {
-          type: "web_search_20260209",
-          name: "web_search",
-          max_uses: 5,
-        } as unknown as Anthropic.Messages.Tool,
-      ],
+      tools: [WEB_SEARCH_TOOL],
     }),
   );
 
@@ -208,17 +207,17 @@ export async function callClaudeWithSearch(
 export async function callClaudePlainText(
   systemPrompt: string,
   userMessage: string,
-  options?: { maxTokens?: number },
+  options: { maxTokens?: number; mockText?: string } = {},
 ): Promise<string> {
   if (isMockMode()) {
     await delay(250);
-    return getMockStageTransition();
+    return options.mockText ?? "This is a mock response.";
   }
 
   const response = await withRetry(() =>
     anthropic().messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: options?.maxTokens ?? 4096,
+      max_tokens: options.maxTokens ?? 4096,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),

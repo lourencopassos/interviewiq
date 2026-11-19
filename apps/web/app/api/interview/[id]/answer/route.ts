@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { getOrCreateOrchestrator, OrchestratorError } from "@interviewiq/ai";
+import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { errorResponse, jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
@@ -10,6 +9,17 @@ const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 /** Multipart framing on top of the audio itself. */
 const MAX_BODY_BYTES = MAX_AUDIO_BYTES + 64 * 1024;
 
+/** Read the `audio` field of a multipart body, or the error code explaining why there is none. */
+async function readAudio(request: Request): Promise<Blob | "NO_AUDIO" | "INVALID_MULTIPART"> {
+  try {
+    const field = (await request.formData()).get("audio");
+    return field instanceof Blob ? field : "NO_AUDIO";
+  } catch {
+    return "INVALID_MULTIPART";
+  }
+}
+
+/** Submit the spoken answer to the current question. Results arrive over SSE. */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -18,9 +28,7 @@ export async function POST(
 
   // Refuse oversized uploads before buffering anything.
   const declaredLength = Number(request.headers.get("content-length") ?? NaN);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return jsonError(413, "TOO_LARGE", "Audio file too large");
-  }
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) return apiError("TOO_LARGE");
 
   return withMockMode(async () => {
     const owner = await assertOwner(id, request);
@@ -29,41 +37,19 @@ export async function POST(
     const rl = checkRateLimit(`answer:${id}`, { maxRequests: 30, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    if (owner.session.status !== "INTERVIEWING") {
-      return jsonError(409, "NOT_INTERVIEWING", `Session is ${owner.session.status}, not accepting answers`);
-    }
+    if (owner.session.status !== "INTERVIEWING") return apiError("NOT_INTERVIEWING");
 
-    let audioFile: Blob;
-    try {
-      const formData = await request.formData();
-      const field = formData.get("audio");
-      if (!field || !(field instanceof Blob)) {
-        return jsonError(400, "NO_AUDIO", "No audio file provided");
-      }
-      audioFile = field;
-    } catch {
-      return jsonError(400, "INVALID_MULTIPART", "Invalid multipart body");
-    }
-
-    if (audioFile.size === 0) {
-      return jsonError(400, "EMPTY_AUDIO", "Audio file is empty");
-    }
-    if (audioFile.size > MAX_AUDIO_BYTES) {
-      return jsonError(413, "TOO_LARGE", "Audio file too large");
-    }
+    const audio = await readAudio(request);
+    if (typeof audio === "string") return apiError(audio);
+    if (audio.size === 0) return apiError("EMPTY_AUDIO");
+    if (audio.size > MAX_AUDIO_BYTES) return apiError("TOO_LARGE");
 
     try {
-      const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
-      const orchestrator = getOrCreateOrchestrator(id);
-      await orchestrator.handleAnswer(audioBuffer, audioFile.type || "audio/webm");
-      return NextResponse.json({ ok: true });
+      const buffer = Buffer.from(await audio.arrayBuffer());
+      await getOrCreateOrchestrator(id).handleAnswer(buffer, audio.type || "audio/webm");
+      return apiOk({ ok: true });
     } catch (error) {
-      if (error instanceof OrchestratorError && error.httpStatus < 500) {
-        console.warn(`Answer rejected (${error.code}):`, error.message);
-      } else {
-        console.error("Answer submission failed:", error);
-      }
-      return errorResponse(error, { status: 500, code: "ANSWER_FAILED", error: "Failed to process answer" });
+      return apiError(error, { fallback: "ANSWER_FAILED", log: "Answer submission failed" });
     }
   });
 }

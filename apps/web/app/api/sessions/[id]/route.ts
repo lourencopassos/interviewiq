@@ -1,9 +1,7 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@interviewiq/db";
-import { destroyOrchestrator } from "@interviewiq/ai";
+import { abandonSession, deleteSession, getSessionSummary } from "@interviewiq/ai";
 import { updateSessionRequestSchema } from "@interviewiq/types";
 import { readJson } from "@/lib/http";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 
 export async function GET(
@@ -15,31 +13,9 @@ export async function GET(
   if (!owner.ok) return owner.response;
 
   try {
-    const session = await prisma.session.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        companyName: true,
-        jobTitle: true,
-        difficulty: true,
-        interviewType: true,
-        language: true,
-        videoMode: true,
-        coachEnabled: true,
-        status: true,
-        currentIndex: true,
-        _count: { select: { questions: true } },
-      },
-    });
-
-    if (!session) {
-      return jsonError(404, "NOT_FOUND", "Session not found");
-    }
-
-    return NextResponse.json(session);
+    return apiOk(await getSessionSummary(id));
   } catch (error) {
-    console.error("Session fetch failed:", error);
-    return jsonError(500, "FAILED", "Failed to fetch session");
+    return apiError(error, { log: "Session fetch failed" });
   }
 }
 
@@ -53,30 +29,17 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const parsed = updateSessionRequestSchema.safeParse(await readJson(request));
-  if (!parsed.success) {
-    return jsonError(400, "INVALID_REQUEST", 'Only { status: "ABANDONED" } is supported', {
-      details: parsed.error.flatten(),
-    });
-  }
+  if (!parsed.success) return apiError("INVALID_REQUEST");
 
   const owner = await assertOwner(id, request, parsed.data.clientId);
   if (!owner.ok) return owner.response;
-
-  if (owner.session.status === "COMPLETED") {
-    return jsonError(409, "ALREADY_COMPLETED", "A completed session cannot be abandoned");
-  }
+  if (owner.session.status === "COMPLETED") return apiError("ALREADY_COMPLETED");
 
   try {
-    const session = await prisma.session.updateMany({
-      where: { id, status: { not: "COMPLETED" } },
-      data: { status: "ABANDONED" },
-    });
-    if (!session.count) return jsonError(409, "ALREADY_COMPLETED", "Session already completed");
-    await destroyOrchestrator(id);
-    return NextResponse.json({ id, status: "ABANDONED" });
+    await abandonSession(id);
+    return apiOk({ id, status: "ABANDONED" });
   } catch (error) {
-    console.error("Session update failed:", error);
-    return jsonError(500, "FAILED", "Failed to update session");
+    return apiError(error, { log: "Session update failed" });
   }
 }
 
@@ -89,11 +52,9 @@ export async function DELETE(
   if (!owner.ok) return owner.response;
 
   try {
-    await destroyOrchestrator(id);
-    await prisma.session.delete({ where: { id } });
+    await deleteSession(id);
     return new Response(null, { status: 204 });
   } catch (error) {
-    console.error("Session delete failed:", error);
-    return jsonError(500, "FAILED", "Failed to delete session");
+    return apiError(error, { log: "Session delete failed" });
   }
 }

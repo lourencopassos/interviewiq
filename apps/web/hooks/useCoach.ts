@@ -1,13 +1,37 @@
 "use client";
 
-import { getClientId } from "@/lib/client-id";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CoachNoteView, CoachRequest, CoachStreamEvent } from "@interviewiq/types";
+import { ApiError, apiFetch, apiRequest } from "@/lib/api-client";
+import { toUiError, type UiError } from "@/lib/errors";
 
-export interface CoachAskResult {
-  ok: boolean;
-  note?: CoachNoteView;
-  error?: { code: string; message: string };
+/** Read NDJSON lines from a streamed response body, one parsed object per line. */
+async function* readNdjson<T>(body: ReadableStream<Uint8Array>): AsyncGenerator<T> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const parse = (line: string): T | null => {
+    if (!line.trim()) return null;
+    try {
+      return JSON.parse(line) as T;
+    } catch {
+      return null;
+    }
+  };
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const event = parse(line);
+      if (event) yield event;
+    }
+  }
+  const last = parse(buffer);
+  if (last) yield last;
 }
 
 /**
@@ -19,16 +43,15 @@ export function useCoach(sessionId: string, enabled: boolean) {
   const [model, setModel] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ request: CoachRequest; text: string } | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Restore notes after a refresh
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    fetch(`/api/interview/${sessionId}/coach`, { headers: { "x-client-id": getClientId() } })
-      .then((r) => (r.ok ? r.json() : { notes: [] }))
-      .then((data: { notes?: CoachNoteView[]; model?: string }) => {
+    apiFetch<{ notes?: CoachNoteView[]; model?: string }>(`/api/interview/${sessionId}/coach`)
+      .then((data) => {
         if (cancelled) return;
         if (Array.isArray(data.notes)) setNotes(data.notes);
         if (typeof data.model === "string") setModel(data.model);
@@ -44,8 +67,8 @@ export function useCoach(sessionId: string, enabled: boolean) {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const ask = useCallback(
-    async (request: CoachRequest): Promise<CoachAskResult> => {
-      if (isStreaming) return { ok: false, error: { code: "BUSY", message: "busy" } };
+    async (request: CoachRequest): Promise<void> => {
+      if (isStreaming) return;
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -55,79 +78,29 @@ export function useCoach(sessionId: string, enabled: boolean) {
       setIsStreaming(true);
 
       try {
-        const res = await fetch(`/api/interview/${sessionId}/coach`, {
+        const res = await apiRequest(`/api/interview/${sessionId}/coach`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-client-id": getClientId() },
-          body: JSON.stringify(request),
+          json: request,
           signal: controller.signal,
         });
+        if (!res.body) throw new ApiError("COACH_FAILED", { status: res.status, retryable: true });
 
-        if (!res.ok || !res.body) {
-          const data = await res.json().catch(() => ({}));
-          const err = {
-            code: typeof data?.code === "string" ? data.code : `HTTP_${res.status}`,
-            message: typeof data?.error === "string" ? data.error : `Request failed (${res.status})`,
-          };
-          setError(err);
-          setDraft(null);
-          return { ok: false, error: err };
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
         let text = "";
-        let finalNote: CoachNoteView | undefined;
-        let streamError: { code: string; message: string } | undefined;
-
-        const handle = (line: string) => {
-          if (!line.trim()) return;
-          let event: CoachStreamEvent;
-          try {
-            event = JSON.parse(line) as CoachStreamEvent;
-          } catch {
-            return;
-          }
+        for await (const event of readNdjson<CoachStreamEvent>(res.body)) {
           if (event.type === "delta") {
             text += event.text;
             setDraft({ request, text });
           } else if (event.type === "done") {
-            finalNote = event.note;
-          } else if (event.type === "error") {
-            streamError = { code: event.code, message: event.message };
+            setNotes((prev) => [...prev, event.note]);
+          } else {
+            throw new ApiError(event.code, { status: res.status, retryable: true });
           }
-        };
-
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) handle(line);
         }
-        if (buffer) handle(buffer);
-
-        if (streamError) {
-          setError(streamError);
-          setDraft(null);
-          return { ok: false, error: streamError };
-        }
-        if (finalNote) {
-          setNotes((prev) => [...prev, finalNote!]);
-        }
-        setDraft(null);
-        return { ok: true, note: finalNote };
       } catch (err) {
-        if ((err as Error).name === "AbortError") {
-          setDraft(null);
-          return { ok: false, error: { code: "ABORTED", message: "aborted" } };
-        }
-        const e = { code: "NETWORK", message: err instanceof Error ? err.message : "Network error" };
-        setError(e);
-        setDraft(null);
-        return { ok: false, error: e };
+        // A cancelled request is the user's choice, not an error.
+        if (!(err instanceof DOMException && err.name === "AbortError")) setError(toUiError(err));
       } finally {
+        setDraft(null);
         setIsStreaming(false);
       }
     },

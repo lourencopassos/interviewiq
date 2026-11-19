@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { iceCandidateRequestSchema } from "@interviewiq/types";
 import { withMockMode } from "@/lib/with-mock-mode";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { readJson } from "@/lib/http";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 
+/** Relay one browser ICE candidate to the session's D-ID stream. */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -22,16 +22,13 @@ export async function POST(
     if (!rl.allowed) return rateLimitResponse(rl);
 
     const parsed = iceCandidateRequestSchema.safeParse(await readJson(request));
-    if (!parsed.success) {
-      return jsonError(400, "INVALID_REQUEST", "Invalid request", { details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return apiError("INVALID_REQUEST");
 
     try {
       const relayed = await getOrCreateOrchestrator(id).handleIceCandidate(parsed.data.candidate);
-      return NextResponse.json({ ok: relayed });
+      return apiOk({ ok: relayed });
     } catch (error) {
-      console.error("ICE candidate relay failed:", error);
-      return jsonError(502, "AVATAR_UNAVAILABLE", "Failed to relay ICE candidate");
+      return apiError(error, { fallback: "AVATAR_UNAVAILABLE", log: "ICE candidate relay failed" });
     }
   });
 }

@@ -5,6 +5,7 @@ import { useSetupStore } from "@/lib/stores/setup-store";
 import { useI18n, interpolate, LOCALE_TAGS } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { JOB_DESCRIPTION_MIN_LENGTH } from "@interviewiq/types";
+import { usePasteModifier } from "@/hooks/usePasteModifier";
 
 export function JobDescriptionInput() {
   const { t, locale } = useI18n();
@@ -14,6 +15,7 @@ export function JobDescriptionInput() {
   const minChars = JOB_DESCRIPTION_MIN_LENGTH;
   const ready = charCount >= minChars;
   const remaining = minChars - charCount;
+  const pasteModifier = usePasteModifier();
 
   return (
     <div className="space-y-3">
@@ -22,7 +24,7 @@ export function JobDescriptionInput() {
           <span className="text-ink">[ 01 ]</span> {t.setup.posting.label}
         </label>
         <span className="hidden items-center gap-1.5 text-[11px] text-muted-foreground sm:inline-flex">
-          <span className="kbd">⌘</span>
+          <span className="kbd">{pasteModifier}</span>
           <span className="kbd">V</span>
         </span>
       </div>

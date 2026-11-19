@@ -27,6 +27,8 @@ export const common = {
     ABANDONED: "Abandoned",
   },
   tier: { poor: "needs depth", good: "good", excellent: "excellent" },
+  /** Question categories from the question generator. */
+  category: { technical: "Technical", behavioral: "Behavioral", system_design: "System design", culture_fit: "Culture fit" },
   score: "Score",
   question: "Question",
   mock: { on: "Mock on", off: "Mock off", titleOn: "Mock mode on: no paid API calls", titleOff: "Mock mode off: real API calls" },

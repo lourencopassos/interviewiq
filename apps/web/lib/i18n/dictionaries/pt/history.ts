@@ -23,13 +23,6 @@ export const history: typeof En = {
     confirm: "Confirmar",
     deleteLabel: "Excluir sessão",
   },
-  deleteErrors: {
-    network: "Erro de rede — não foi possível excluir a sessão",
-    forbidden: "Você só pode excluir as suas próprias sessões",
-    gone: "A sessão não existe mais",
-    status: "Falha ao excluir a sessão ({status})",
-    generic: "Falha ao excluir a sessão",
-  },
   deleteAll: {
     eyebrow: "privacidade",
     body: "Sessões, currículos e transcrições ficam salvos no banco de dados deste servidor. As vagas salvas e o seu currículo também ficam neste navegador.",
@@ -37,8 +30,6 @@ export const history: typeof En = {
     confirm: "Excluir tudo",
     deleting: "Excluindo…",
     done: "{n} sessões excluídas do servidor. O currículo e as vagas salvos neste navegador também foram removidos.",
-    failed: "Não foi possível excluir seus dados ({status})",
-    network: "Erro de rede — nada foi excluído",
   },
   empty: {
     eyebrow: "[ vazio ]",

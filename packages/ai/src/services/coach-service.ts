@@ -1,10 +1,10 @@
 import { prisma } from "@interviewiq/db";
-import type { CoachNoteView, CoachRequest, CoachSource, Language } from "@interviewiq/types";
+import type { CoachNoteView, CoachRequest, CoachSource } from "@interviewiq/types";
 import { COACH_MODEL, streamClaudeText } from "../client";
 import { isMockMode } from "../mock";
 import { getMockCoachAnswer } from "../mock/fixtures/coach";
 import { buildCoachSystemPrompt, buildCoachUserMessage } from "../prompts/coach-explainer";
-import { OrchestratorError } from "./interview-orchestrator";
+import { AppError } from "../errors";
 import { parseQuestionMeta } from "../utils/question-meta";
 
 /** Map a stored CoachNote row to the view shared by the coach panel and the report. */
@@ -62,16 +62,12 @@ export async function* streamCoachAnswer(
       currentIndex: true,
     },
   });
-  if (!session) throw new OrchestratorError("SESSION_NOT_FOUND", "Session not found", 404);
+  if (!session) throw new AppError("SESSION_NOT_FOUND");
   if (!session.coachEnabled) {
-    throw new OrchestratorError("COACH_DISABLED", "The coach is turned off for this session", 403);
+    throw new AppError("COACH_DISABLED");
   }
   if (session.status !== "INTERVIEWING") {
-    throw new OrchestratorError(
-      "NOT_INTERVIEWING",
-      "The coach is only available during the interview",
-      409,
-    );
+    throw new AppError("NOT_INTERVIEWING", { message: "The coach is only available during the interview" });
   }
 
   // Resolve the question: the one the client names, else the current one.
@@ -98,7 +94,7 @@ export async function* streamCoachAnswer(
     companyName: session.companyName,
     jobTitle: session.jobTitle,
     difficulty: session.difficulty,
-    language: session.language as Language,
+    language: session.language,
     question: question
       ? { text: question.text, category: question.category, targetSkill }
       : null,

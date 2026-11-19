@@ -22,11 +22,12 @@ export const landing: typeof En = {
     demoCaption: "Uma prévia roteirizada. Sessões reais usam as suas chaves.",
   },
   demo: {
-    live: "Ao vivo · Frontend Sênior · Stripe",
+    live: "Ao vivo · Frontend Sênior · Northwind Labs",
     interviewer: "Entrevistador",
     you: "você",
     followUp: "aprofundamento",
     listening: "ouvindo",
+    recordingAnswer: "Gravando resposta",
     waiting: "Aguardando a pergunta terminar…",
     transcribed: "Resposta transcrita · 48s",
     record: "gravar",
@@ -34,7 +35,7 @@ export const landing: typeof En = {
     rule: "nota < 65 → aprofundamento",
     script: [
       {
-        question: "O dashboard da Stripe renderiza milhares de linhas. Onde o React começa a sofrer e qual seria sua primeira medida?",
+        question: "O dashboard de analytics da Northwind renderiza milhares de linhas. Onde o React começa a sofrer e qual seria sua primeira medida?",
         feedback: "Bom instinto de medir antes de memoizar.",
       },
       {

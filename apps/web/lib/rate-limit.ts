@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { apiError } from "./api-response";
 
 interface RateLimitEntry {
   count: number;
@@ -74,8 +74,5 @@ export function rateLimitResponse(result?: RateLimitResult) {
     headers["X-RateLimit-Limit"] = String(result.limit);
     headers["X-RateLimit-Remaining"] = String(result.remaining);
   }
-  return NextResponse.json(
-    { error: "Too many requests. Please try again later.", code: "RATE_LIMITED", retryable: true },
-    { status: 429, headers },
-  );
+  return apiError("RATE_LIMITED", { headers });
 }

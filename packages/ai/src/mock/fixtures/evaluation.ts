@@ -103,7 +103,6 @@ const MOCK_EVALUATIONS: AnswerEvaluation[] = [
 
 // Per-session counter to rotate through evaluations
 declare global {
-  // eslint-disable-next-line no-var
   var __mockEvalCounter: Map<string, number> | undefined;
 }
 

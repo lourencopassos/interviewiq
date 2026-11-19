@@ -34,7 +34,7 @@ export function SiteNav() {
           </span>
         </Link>
 
-        <nav className="ml-2 hidden items-center gap-1 sm:flex" aria-label="Primary">
+        <nav className="ml-2 hidden items-center gap-1 sm:flex" aria-label={t.nav.primary}>
           {tabs.map((tab) => {
             const active = pathname === tab.href || pathname?.startsWith(tab.href + "/");
             return (

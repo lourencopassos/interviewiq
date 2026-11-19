@@ -10,6 +10,7 @@ import { callClaude } from "../client";
 import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
 import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
+import { fallbacksFor } from "../i18n/fallbacks";
 
 interface QuestionWithAnswer {
   text: string;
@@ -130,11 +131,11 @@ export async function generateCoachingReport(params: {
       "Report generation validation failed:",
       result.error.flatten(),
     );
+    const fallback = fallbacksFor(params.language).report;
     return recoverWithDefaults(coachingReportSchema, raw, {
       overallScore: 50,
       verdict: "Borderline",
-      executiveSummary:
-        "The interview has been completed. Please review individual question scores for detailed feedback.",
+      executiveSummary: fallback.executiveSummary,
       dimensionScores: {
         technical: 50,
         problemSolving: 50,
@@ -144,11 +145,8 @@ export async function generateCoachingReport(params: {
       strengths: [],
       areasToImprove: [],
       studyPlan: [],
-      nextInterviewTips: [
-        "Review your responses and practice articulating your thoughts more clearly.",
-      ],
-      companyCultureFit:
-        "Unable to assess culture fit based on available data.",
+      nextInterviewTips: [fallback.nextInterviewTip],
+      companyCultureFit: fallback.companyCultureFit,
       estimatedRetakeReadiness: 14,
     }, "report-generator");
   }

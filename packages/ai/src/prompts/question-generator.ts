@@ -14,6 +14,7 @@ import { z } from "zod";
 import { parseJsonObject } from "../utils/json";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
+import { fallbacksFor } from "../i18n/fallbacks";
 
 const questionSetTool = {
   name: "submit_interview_questions",
@@ -21,16 +22,22 @@ const questionSetTool = {
   input_schema: { ...zodToJsonSchema(questionSetSchema), type: "object" as const },
 };
 
-// Claude occasionally serializes the array inside the tool input. Decode it
-// at the provider boundary and validate every question with the shared schema.
-const questionSetResponse = questionSetSchema.extend({
-  opening: questionSetSchema.shape.opening.default("Welcome! Let's get started with your interview."),
-  closing: questionSetSchema.shape.closing.default("Thank you for your time today."),
-  questions: z.preprocess(
-    (value) => typeof value === "string" ? parseJsonObject(value) ?? value : value,
-    questionSetSchema.shape.questions,
-  ),
-});
+/**
+ * Claude occasionally serializes the array inside the tool input. Decode it
+ * at the provider boundary and validate every question with the shared schema.
+ * A missing opening or closing falls back to fixed copy in the interview language.
+ */
+function questionSetResponse(language: Language | undefined) {
+  const fallback = fallbacksFor(language);
+  return questionSetSchema.extend({
+    opening: questionSetSchema.shape.opening.default(fallback.opening),
+    closing: questionSetSchema.shape.closing.default(fallback.closing),
+    questions: z.preprocess(
+      (value) => typeof value === "string" ? parseJsonObject(value) ?? value : value,
+      questionSetSchema.shape.questions,
+    ),
+  });
+}
 
 interface QuestionSetParams {
   companyName: string;
@@ -100,8 +107,9 @@ export async function generateQuestionSet(params: QuestionSetParams): Promise<Qu
   const userMessage = `${context}\n\n${request}`;
 
   const options = { maxTokens: 8192, tool: questionSetTool };
+  const response = questionSetResponse(params.language);
   const raw = await callClaude(systemPrompt, userMessage, options);
-  const result = questionSetResponse.safeParse(raw);
+  const result = response.safeParse(raw);
   if (result.success) return result.data;
 
   const fields = result.error.issues.map((issue) => issue.path.join(".")).join(", ");
@@ -109,5 +117,5 @@ export async function generateQuestionSet(params: QuestionSetParams): Promise<Qu
     `${userMessage} Regenerate the set. The previous tool input failed validation at: ${fields}. Supply questions as an array of question objects.`,
     options,
   );
-  return questionSetResponse.parse(retry);
+  return response.parse(retry);
 }

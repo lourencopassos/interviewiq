@@ -4,6 +4,7 @@ export * from "./session";
 export * from "./question";
 export * from "./evaluation";
 export * from "./report";
+export * from "./errors";
 export * from "./events";
 export * from "./avatar";
 export * from "./coach";

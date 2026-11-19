@@ -3,6 +3,8 @@
 import { Mic, CornerDownRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { interpolate, useI18n } from "@/lib/i18n";
+import { label } from "@/lib/labels";
+import { categoryTone } from "@/lib/score";
 
 interface QuestionCardProps {
   text: string;
@@ -13,13 +15,6 @@ interface QuestionCardProps {
   isFollowUp?: boolean;
 }
 
-const categoryTone: Record<string, "sky" | "sage" | "butter" | "lavender"> = {
-  technical: "sky",
-  behavioral: "sage",
-  system_design: "butter",
-  culture_fit: "lavender",
-};
-
 /** The interviewer's row: peach avatar tile, eyebrow, and the question itself. */
 export function QuestionCard({
   text,
@@ -29,8 +24,7 @@ export function QuestionCard({
   isFollowUp = false,
 }: QuestionCardProps) {
   const { t } = useI18n();
-  const categoryLabel =
-    (t.interview.question.category as Record<string, string>)[category] ?? category;
+  const categoryLabel = label(t, "category", category);
 
   return (
     <article className="tile animate-pop-in p-5 sm:p-6">

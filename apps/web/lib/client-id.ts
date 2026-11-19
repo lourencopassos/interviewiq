@@ -19,8 +19,3 @@ export function getClientId(): string {
   document.cookie = `${CLIENT_ID_COOKIE}=${encodeURIComponent(id)}; Path=/; Max-Age=${ONE_YEAR_SECONDS}; SameSite=Lax`;
   return id;
 }
-
-/** Headers that identify this browser to `[id]` API routes. */
-export function clientHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  return { ...extra, "x-client-id": getClientId() };
-}

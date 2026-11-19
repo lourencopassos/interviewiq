@@ -1,12 +1,12 @@
-import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { sdpAnswerRequestSchema } from "@interviewiq/types";
 import { withMockMode } from "@/lib/with-mock-mode";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { readJson } from "@/lib/http";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 
+/** Relay the browser's WebRTC SDP answer to the session's D-ID stream. */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -21,19 +21,13 @@ export async function POST(
     if (!rl.allowed) return rateLimitResponse(rl);
 
     const parsed = sdpAnswerRequestSchema.safeParse(await readJson(request));
-    if (!parsed.success) {
-      return jsonError(400, "INVALID_REQUEST", "Invalid request", { details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return apiError("INVALID_REQUEST");
 
     try {
       const relayed = await getOrCreateOrchestrator(id).handleSdpAnswer(parsed.data.sdpAnswer);
-      if (!relayed) {
-        return jsonError(409, "NO_AVATAR_STREAM", "No active avatar stream for this session", { ok: false });
-      }
-      return NextResponse.json({ ok: true });
+      return relayed ? apiOk({ ok: true }) : apiError("NO_AVATAR_STREAM");
     } catch (error) {
-      console.error("SDP answer relay failed:", error);
-      return jsonError(502, "AVATAR_UNAVAILABLE", "Failed to relay SDP answer");
+      return apiError(error, { fallback: "AVATAR_UNAVAILABLE", log: "SDP answer relay failed" });
     }
   });
 }

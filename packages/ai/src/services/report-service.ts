@@ -8,6 +8,9 @@ import {
 } from "@interviewiq/types";
 import { isString, parseJsonArray, parseJsonObject } from "../utils/json";
 import { toCoachNoteView } from "./coach-service";
+import { fallbacksFor } from "../i18n/fallbacks";
+import { AppError } from "../errors";
+import { getOrCreateOrchestrator } from "../interview";
 
 export interface ReportQuestionView {
   id: string;
@@ -56,7 +59,7 @@ export function verdictForScore(score: number): CoachingReport["verdict"] {
  * Rebuild a CoachingReport from the typed Report columns. Used only when the
  * full JSON in `summary` is missing or corrupt.
  */
-function reportFromColumns(r: {
+function reportFromColumns(language: string, r: {
   overallScore: number;
   technicalScore: number;
   behavioralScore: number;
@@ -68,8 +71,7 @@ function reportFromColumns(r: {
   return {
     overallScore: r.overallScore,
     verdict: verdictForScore(r.overallScore),
-    executiveSummary:
-      "The detailed summary could not be loaded. Scores below are from the stored report.",
+    executiveSummary: fallbacksFor(language).report.storedSummaryUnavailable,
     dimensionScores: {
       technical: r.technicalScore,
       problemSolving: Math.round((r.technicalScore + r.communicationScore) / 2),
@@ -121,7 +123,7 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
 
   // Reports stored before URLs were validated may hold non-https links; null them rather than discard the report.
   const parsed = coachingReportSchema.safeParse(sanitizeReportUrls(parseJsonObject(session.report.summary)));
-  const report = parsed.success ? parsed.data : reportFromColumns(session.report);
+  const report = parsed.success ? parsed.data : reportFromColumns(session.language, session.report);
 
   const notesByQuestion = new Map<string, CoachNoteView[]>();
   for (const n of session.coachNotes) {
@@ -165,4 +167,23 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
     },
     questions,
   };
+}
+
+/**
+ * Return the report, generating it first when a finished interview has none
+ * (generation failed or was interrupted). Idempotent: an existing report is
+ * returned as-is.
+ */
+export async function ensureReport(sessionId: string): Promise<ReportPayload> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { status: true, report: { select: { id: true } } },
+  });
+  if (!session) return { kind: "not_found" };
+  if (session.report) return getReportPayload(sessionId);
+  if (session.status !== "WRAPPING_UP" && session.status !== "COMPLETED") {
+    throw new AppError("NOT_FINISHED", { details: `session is ${session.status}` });
+  }
+  await getOrCreateOrchestrator(sessionId).generateReport();
+  return getReportPayload(sessionId);
 }

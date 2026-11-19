@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { ClientError } from "@/lib/errors";
 
 type PermissionState = "prompt" | "granted" | "denied" | "unknown";
 
@@ -133,6 +134,11 @@ export function useAudioRecorder() {
     animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
   }, []);
 
+  /**
+   * Ask for the microphone and start capturing. Rejects with the browser's
+   * DOMException (NotAllowedError, NotFoundError, or AbortError when
+   * `cancelRecording` won the race) or whatever MediaRecorder threw.
+   */
   const startRecording = useCallback(async () => {
     // Never allow two concurrent recordings
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
@@ -211,11 +217,12 @@ export function useAudioRecorder() {
     }
   }, [updateAudioLevel, releaseResources]);
 
+  /** Stop capturing and resolve with the recording; rejects with ClientError("RECORD_FAILED"). */
   const stopRecording = useCallback((): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const mediaRecorder = mediaRecorderRef.current;
       if (!mediaRecorder || mediaRecorder.state === "inactive") {
-        reject(new Error("No active recording"));
+        reject(new ClientError("RECORD_FAILED"));
         return;
       }
 
@@ -247,7 +254,7 @@ export function useAudioRecorder() {
           duration: 0,
           audioLevel: 0,
         }));
-        reject(new Error("Recording failed"));
+        reject(new ClientError("RECORD_FAILED"));
       };
 
       mediaRecorder.stop();
