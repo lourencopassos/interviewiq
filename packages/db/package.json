@@ -15,6 +15,7 @@
     "generate": "prisma generate",
     "postinstall": "prisma generate",
     "studio": "prisma studio",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
