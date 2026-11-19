@@ -7,6 +7,7 @@ import {
 import { callClaude } from "../client";
 import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
+import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
 
 function buildSystemPrompt(params: {
   companyName: string;
@@ -15,10 +16,10 @@ function buildSystemPrompt(params: {
   questionText: string;
   targetSkill: string;
   scoringGuide: { poor: string; good: string; excellent: string };
-  resumeText?: string | null;
+  hasResume: boolean;
   language?: Language;
 }): string {
-  const { companyName, jobTitle, difficulty, questionText, targetSkill, scoringGuide, resumeText } = params;
+  const { companyName, jobTitle, difficulty, questionText, targetSkill, scoringGuide, hasResume } = params;
 
   return `You are a senior interviewer at ${companyName} evaluating a candidate for ${jobTitle} (${difficulty}).
 
@@ -30,7 +31,7 @@ Scoring guide:
 - Good answer: ${scoringGuide.good}
 - Excellent answer: ${scoringGuide.excellent}
 
-Evaluate the candidate's answer and return JSON:
+Evaluate the candidate's answer (inside <transcript> tags in the user message) and return JSON:
 
 {
   "score": number,                  // 0-100
@@ -46,12 +47,10 @@ Be rigorous but fair. Score calibrated to the ${difficulty} difficulty level.
 shortFeedback should be natural and conversational — it will be spoken aloud as a transition.
 For a self-introduction, evaluate clarity and relevance. A concise overview is sufficient; technical depth, metrics and a detailed project story belong in later questions.
 When a follow-up is useful, ask one short question about a choice, observation or gap in this answer. Use the candidate's own example. If they gave no example and the question called for one, invite them to choose one. The scoring guide describes evidence to look for; credit other sound approaches.
-${resumeText ? `
-Candidate's resume/CV context:
-${resumeText}
-
-Use the CV to understand references the candidate makes. Score what the question asked and what the candidate said.
+${hasResume ? `
+The candidate's resume/CV is inside <resume> tags in the user message. Use it to understand references the candidate makes. Score what the question asked and what the candidate said.
 ` : ""}
+${DATA_ONLY_INSTRUCTION}
 ${languageInstruction(params.language)}
 Return ONLY valid JSON.`;
 }
@@ -67,10 +66,16 @@ export async function evaluateAnswer(params: {
   resumeText?: string | null;
   language?: Language;
 }): Promise<AnswerEvaluation> {
-  const { transcript, ...promptParams } = params;
-  const systemPrompt = buildSystemPrompt(promptParams);
+  const { transcript, resumeText, ...promptParams } = params;
+  const systemPrompt = buildSystemPrompt({ ...promptParams, hasResume: Boolean(resumeText) });
 
-  const raw = await callClaude(systemPrompt, `Candidate's answer (transcript):\n\n${transcript}`);
+  const userMessage = [
+    resumeText ? tagged("resume", resumeText) : null,
+    `Candidate's answer:\n${tagged("transcript", transcript)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const raw = await callClaude(systemPrompt, userMessage);
   const result = answerEvaluationSchema.safeParse(raw);
 
   if (!result.success) {
