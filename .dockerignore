@@ -1,0 +1,22 @@
+# Dependencies and build output are recreated inside the image.
+**/node_modules
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+coverage
+
+# Never send secrets to the build context; env is supplied at runtime.
+**/.env*
+!.env.example
+!**/.env.example
+
+# Not needed to build or run the app.
+.git
+.github
+.claude
+.claude-memory
+docs/history
+FIXES.md
+Dockerfile
+.dockerignore
+*.log
