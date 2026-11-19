@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { jsonError } from "@/lib/api-response";
+import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 /**
@@ -9,12 +11,15 @@ import { withMockMode } from "@/lib/with-mock-mode";
  * SSE as `avatar_stream_ready`; this just returns whether a stream was created.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   return withMockMode(async () => {
+    const owner = await assertOwner(id, request);
+    if (!owner.ok) return owner.response;
+
     const rl = checkRateLimit(`avatar-offer:${id}`, { maxRequests: 6, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
@@ -23,7 +28,7 @@ export async function POST(
       return NextResponse.json({ ok });
     } catch (error) {
       console.error("Avatar offer failed:", error);
-      return NextResponse.json({ ok: false, error: "Could not create an avatar stream" }, { status: 502 });
+      return jsonError(502, "AVATAR_UNAVAILABLE", "Could not create an avatar stream", { ok: false });
     }
   });
 }

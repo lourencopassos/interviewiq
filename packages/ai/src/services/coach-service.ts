@@ -112,10 +112,13 @@ export async function* streamCoachAnswer(
     question: question
       ? { text: question.text, category: question.category, targetSkill }
       : null,
+    answered: Boolean(question?.transcript),
+  });
+  const userMessage = buildCoachUserMessage({
+    ...request,
     transcript: question?.transcript ?? null,
     priorNotes: priorNotes.reverse(),
   });
-  const userMessage = buildCoachUserMessage(request);
 
   let answer = "";
   const model = isMockMode() ? "mock" : COACH_MODEL;

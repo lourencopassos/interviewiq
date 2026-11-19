@@ -1,5 +1,8 @@
 import type { SessionStatus } from "./session";
 
+/** Stable codes for `avatar_stream_failed`; provider details stay in server logs. */
+export type AvatarFailureCode = "AVATAR_UNAVAILABLE" | "AVATAR_QUOTA" | "AVATAR_NO_CREDITS";
+
 export type InterviewEvent =
   | { type: "state_change"; data: { status: SessionStatus } }
   | {
@@ -49,7 +52,7 @@ export type InterviewEvent =
       };
     }
   | { type: "avatar_stream_audio"; data: { questionId: string } }
-  | { type: "avatar_stream_failed"; data: { reason: string } }
+  | { type: "avatar_stream_failed"; data: { code: AvatarFailureCode; reason: string } }
   | {
       type: "error";
       data: { code: string; message: string; retryable: boolean };

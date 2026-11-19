@@ -12,11 +12,14 @@ import {
   type Language,
   type InterviewEvent,
   type InterviewStage,
+  type AvatarFailureCode,
 } from "@interviewiq/types";
 import { AudioPipeline } from "./audio-pipeline";
 import { AdaptiveEngine, type AdaptiveQuestion } from "./adaptive-engine";
 import { ttsCache } from "../cache/tts-cache";
-import { AvatarStream } from "./avatar-stream";
+import { AvatarStream, AvatarStreamError } from "./avatar-stream";
+import { isMockMode } from "../mock";
+import { MissingApiKeyError } from "../errors";
 import { sseEmitter } from "../sse/emitter";
 import { generateQuestionSet } from "../prompts/question-generator";
 import { evaluateAnswer } from "../prompts/answer-evaluator";
@@ -43,6 +46,18 @@ export class OrchestratorError extends Error {
     super(message);
     this.name = "OrchestratorError";
   }
+}
+
+/** Fixed client copy for `avatar_stream_failed`; provider detail stays in the server log. */
+const AVATAR_FAILURE_REASON: Record<AvatarFailureCode, string> = {
+  AVATAR_UNAVAILABLE: "The video interviewer is unavailable. Continuing with audio.",
+  AVATAR_QUOTA: "The video service is at its concurrent stream limit. Continuing with audio.",
+  AVATAR_NO_CREDITS: "The video service account has no credits left. Continuing with audio.",
+};
+
+function avatarFailure(error: unknown): { code: AvatarFailureCode; reason: string } {
+  const code = error instanceof AvatarStreamError ? error.code : "AVATAR_UNAVAILABLE";
+  return { code, reason: AVATAR_FAILURE_REASON[code] };
 }
 
 /** Shape we persist in Question.metadata (a GeneratedQuestion plus runtime flags). */
@@ -250,16 +265,19 @@ export class InterviewOrchestrator {
   async speakCurrent(): Promise<boolean> {
     if (!this.avatarStream?.isActive || !this.lastSpoken) return false;
     const { questionId, text } = this.lastSpoken;
+    // A stream minted while mock mode was on must not serve a real request (and
+    // vice versa): mint a matching one. The text queues until its handshake.
+    if (this.avatarStream.mock !== isMockMode()) {
+      await this.setupAvatar(await this.loadSession());
+      if (!this.avatarStream?.isActive) return false;
+    }
     try {
       await this.avatarStream.sendText(text);
       this.emit({ type: "avatar_stream_audio", data: { questionId } });
       return true;
     } catch (error) {
       console.warn(`Avatar stream text failed for ${questionId}:`, error);
-      this.emit({
-        type: "avatar_stream_failed",
-        data: { reason: error instanceof Error ? error.message : "Stream text failed" },
-      });
+      this.emit({ type: "avatar_stream_failed", data: avatarFailure(error) });
       return false;
     }
   }
@@ -358,12 +376,7 @@ export class InterviewOrchestrator {
     } catch (error) {
       console.warn("Avatar stream creation failed, falling back to audio-only:", error);
       this.avatarStream = null;
-      this.emit({
-        type: "avatar_stream_failed",
-        data: {
-          reason: error instanceof Error ? error.message : "Stream creation failed",
-        },
-      });
+      this.emit({ type: "avatar_stream_failed", data: avatarFailure(error) });
     }
   }
 
@@ -483,14 +496,16 @@ export class InterviewOrchestrator {
       await this.avatarStream?.destroy().catch(() => undefined);
       this.avatarStream = null;
 
+      // The start route logs the full error. OrchestratorError messages are our own fixed copy; anything else
+      // (provider bodies, stack details) stays in the server log.
       this.emit({
         type: "error",
-        data: {
-          code: error instanceof OrchestratorError ? error.code : "START_FAILED",
-          message:
-            error instanceof Error ? error.message : "Failed to start the interview",
-          retryable: true,
-        },
+        data:
+          error instanceof OrchestratorError
+            ? { code: error.code, message: error.message, retryable: true }
+            : error instanceof MissingApiKeyError
+              ? { code: error.code, message: error.message, retryable: false }
+              : { code: "START_FAILED", message: "Failed to start the interview. Please try again.", retryable: true },
       });
       throw error;
     }

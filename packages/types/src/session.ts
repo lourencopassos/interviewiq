@@ -68,10 +68,10 @@ export const FULL_LOOP_STAGES = [
 ] as const;
 
 export const createSessionRequestSchema = z.object({
-  clientId: z.string().min(1),
-  jobTitle: z.string().min(1),
-  companyName: z.string().min(1),
-  jobDescription: z.string().min(50),
+  clientId: z.string().min(1).max(128),
+  jobTitle: z.string().min(1).max(200),
+  companyName: z.string().min(1).max(200),
+  jobDescription: z.string().min(50).max(15000),
   difficulty: z.enum(["JUNIOR", "MID", "SENIOR", "STAFF"]),
   interviewType: z.enum([
     "PHONE_SCREEN",
@@ -85,15 +85,19 @@ export const createSessionRequestSchema = z.object({
   /** Allow pausing to ask the coach model about a question mid-interview. */
   coachEnabled: z.boolean().optional().default(true),
   resumeText: z.string().max(20000).optional(),
-  parsedJob: z.string().optional(),
-  companyIntel: z.string().optional(),
+  parsedJob: z.string().max(20000).optional(),
+  companyIntel: z.string().max(20000).optional(),
 });
 
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 
-/** The only client-driven status transition: abandoning an in-progress interview. */
+/**
+ * The only client-driven status transition: abandoning an in-progress interview.
+ * Ownership comes from the `x-client-id` header / client cookie; a body
+ * `clientId` is accepted only as a fallback for older clients.
+ */
 export const updateSessionRequestSchema = z.object({
-  clientId: z.string().min(1),
+  clientId: z.string().min(1).max(128).optional(),
   status: z.literal("ABANDONED"),
 });
 

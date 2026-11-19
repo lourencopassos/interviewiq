@@ -8,6 +8,7 @@ export {
   COACH_MODEL,
 } from "./client";
 export { runWithMockMode, isMockMode } from "./mock";
+export { MissingApiKeyError, type ApiKeyProvider } from "./errors";
 export { parseJobDescription } from "./prompts/job-parser";
 export { researchCompany } from "./prompts/company-research";
 export { generateQuestionSet } from "./prompts/question-generator";

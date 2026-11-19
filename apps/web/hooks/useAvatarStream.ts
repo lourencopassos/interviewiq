@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { clientHeaders } from "@/lib/client-id";
 
 interface AvatarStreamState {
   /** Remote video MediaStream from D-ID (avatar) */
@@ -122,7 +123,7 @@ export function useAvatarStream(sessionId: string) {
             try {
               await fetch(`/api/interview/${sessionId}/avatar-ice`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: clientHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ candidate: event.candidate }),
               });
             } catch {
@@ -189,7 +190,7 @@ export function useAvatarStream(sessionId: string) {
         // Send SDP answer to server → D-ID
         const res = await fetch(`/api/interview/${sessionId}/avatar-sdp`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: clientHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ sdpAnswer: answer }),
         });
         if (!res.ok) {

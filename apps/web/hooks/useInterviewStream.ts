@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useReducer, useCallback, useState } from "react";
-import type { SessionStatus } from "@interviewiq/types";
+import type { AvatarFailureCode, SessionStatus } from "@interviewiq/types";
+import { clientHeaders, getClientId } from "@/lib/client-id";
 
 interface InterviewState {
   status: SessionStatus | null;
@@ -32,6 +33,8 @@ interface InterviewState {
   } | null;
   avatarSpeaking: boolean;
   avatarFailed: boolean;
+  /** Stable code from the last `avatar_stream_failed` event, mapped to copy by the page. */
+  avatarFailureCode: AvatarFailureCode | null;
   isComplete: boolean;
   redirectTo: string | null;
   connectionStatus: "connecting" | "connected" | "reconnecting" | "error";
@@ -84,7 +87,7 @@ type InterviewAction =
       };
     }
   | { type: "avatar_stream_audio"; payload: { questionId: string } }
-  | { type: "avatar_stream_failed"; payload: { reason: string } }
+  | { type: "avatar_stream_failed"; payload: { code?: AvatarFailureCode; reason: string } }
   | {
       type: "error";
       payload: { code: string; message: string; retryable: boolean };
@@ -106,6 +109,7 @@ const initialState: InterviewState = {
   avatarStreamData: null,
   avatarSpeaking: false,
   avatarFailed: false,
+  avatarFailureCode: null,
   isComplete: false,
   redirectTo: null,
   connectionStatus: "connecting",
@@ -170,6 +174,7 @@ function interviewReducer(
       return {
         ...state,
         avatarFailed: false,
+        avatarFailureCode: null,
         avatarStreamData: {
           streamId: action.payload.streamId,
           sdpOffer: action.payload.sdpOffer,
@@ -182,7 +187,7 @@ function interviewReducer(
       return { ...state, avatarSpeaking: true };
 
     case "avatar_stream_failed":
-      return { ...state, avatarFailed: true };
+      return { ...state, avatarFailed: true, avatarFailureCode: action.payload.code ?? "AVATAR_UNAVAILABLE" };
 
     case "error":
       return { ...state, error: action.payload };
@@ -232,6 +237,8 @@ export function useInterviewStream(sessionId: string) {
 
     function connect() {
       if (disposed) return;
+      // EventSource can't send headers: make sure the client-id cookie exists first.
+      getClientId();
       eventSource = new EventSource(`/api/interview/${sessionId}/stream`);
 
       eventSource.onopen = () => {
@@ -297,6 +304,7 @@ export function useInterviewStream(sessionId: string) {
       try {
         response = await fetch(`/api/interview/${sessionId}/answer`, {
           method: "POST",
+          headers: clientHeaders(),
           body: formData,
         });
       } catch {

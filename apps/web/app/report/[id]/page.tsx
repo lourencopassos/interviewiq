@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { CoachingReport, CoachNoteView } from "@interviewiq/types";
 import { interpolate, LOCALE_TAGS, useI18n, type Dictionary } from "@/lib/i18n";
+import { clientHeaders } from "@/lib/client-id";
 import { VerdictBanner } from "@/components/report/verdict-banner";
 import { DimensionScores } from "@/components/report/dimension-scores";
 import { StrengthsImprovements } from "@/components/report/strengths-improvements";
@@ -110,7 +111,7 @@ export default function ReportPage() {
 
       let res: Response;
       try {
-        res = await fetch(`/api/sessions/${id}/report`);
+        res = await fetch(`/api/sessions/${id}/report`, { headers: clientHeaders() });
       } catch {
         if (!cancelled) {
           setView({ kind: "error", message: { key: "network" } });
@@ -125,7 +126,8 @@ export default function ReportPage() {
         return;
       }
 
-      if (res.status === 404) {
+      // 403: the session belongs to another browser; show it as not found.
+      if (res.status === 404 || res.status === 403) {
         setView({ kind: "not_found" });
         return;
       }
@@ -180,7 +182,7 @@ export default function ReportPage() {
     setRegenerating(true);
     setRegenerateError(null);
     try {
-      const res = await fetch(`/api/sessions/${id}/report`, { method: "POST" });
+      const res = await fetch(`/api/sessions/${id}/report`, { method: "POST", headers: clientHeaders() });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setRegenerateError(

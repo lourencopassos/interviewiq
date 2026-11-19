@@ -5,6 +5,7 @@ import { mockIntroduction, mockQuestionSet } from "./mock/fixtures/question-set"
 import { getNextMockEvaluation } from "./mock/fixtures/evaluation";
 import { mockCoachingReport } from "./mock/fixtures/report";
 import { getMockStageTransition } from "./mock/fixtures/stage-transition";
+import { requireApiKey } from "./errors";
 
 /**
  * Single place to configure the model. Override with CLAUDE_MODEL.
@@ -18,10 +19,24 @@ export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
  */
 export const COACH_MODEL = process.env.COACH_MODEL || "claude-haiku-4-5";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 0, // We handle retries ourselves for proper rate limit backoff
-});
+let anthropicClient: { key: string; client: Anthropic } | null = null;
+
+/**
+ * The Anthropic client, created on first use. Throws MissingApiKeyError when
+ * ANTHROPIC_API_KEY is empty so callers get an actionable message instead of
+ * an opaque authentication failure.
+ */
+function anthropic(): Anthropic {
+  const apiKey = requireApiKey("anthropic");
+  if (anthropicClient?.key !== apiKey) {
+    anthropicClient = {
+      key: apiKey,
+      // We handle retries ourselves for proper rate limit backoff
+      client: new Anthropic({ apiKey, maxRetries: 0 }),
+    };
+  }
+  return anthropicClient.client;
+}
 
 const MAX_RETRIES = 3;
 const DEFAULT_RATE_LIMIT_WAIT_MS = 15_000;
@@ -117,7 +132,7 @@ export async function callClaude(
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: options?.maxTokens ?? 4096,
       ...(options?.tool && {
@@ -164,7 +179,7 @@ export async function callClaudeWithSearch(
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 4096,
       system: systemPrompt,
@@ -204,7 +219,7 @@ export async function callClaudePlainText(
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: options?.maxTokens ?? 4096,
       system: systemPrompt,
@@ -236,7 +251,7 @@ export async function* streamClaudeText(
     return;
   }
 
-  const stream = anthropic.messages.stream({
+  const stream = anthropic().messages.stream({
     model: options.model ?? CLAUDE_MODEL,
     max_tokens: options.maxTokens ?? 1024,
     system: systemPrompt,

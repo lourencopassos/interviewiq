@@ -1,6 +1,7 @@
 import { isMockMode, delay } from "../mock";
 import { getMockSilenceBuffer } from "../mock/mock-audio";
 import { getNextMockTranscript } from "../mock/fixtures/transcript";
+import { requireApiKey } from "../errors";
 
 // ElevenLabs premade voices. eleven_turbo_v2_5 is multilingual, so any voice can
 // speak any supported language; these are sensible defaults, overridable per language.
@@ -61,6 +62,7 @@ export class AudioPipeline {
       return getNextMockTranscript();
     }
 
+    const apiKey = requireApiKey("openai");
     const whisper = WHISPER_BY_LANGUAGE[language] ?? WHISPER_BY_LANGUAGE.EN;
     const { type, extension } = normalizeAudioType(mimeType);
 
@@ -80,7 +82,7 @@ export class AudioPipeline {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
           },
           body: formData,
         },
@@ -109,6 +111,7 @@ export class AudioPipeline {
       return getMockSilenceBuffer();
     }
 
+    const apiKey = requireApiKey("elevenlabs");
     const voiceId = VOICE_BY_LANGUAGE[language] ?? VOICE_BY_LANGUAGE.EN;
 
     try {
@@ -118,7 +121,7 @@ export class AudioPipeline {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "xi-api-key": process.env.ELEVENLABS_API_KEY || "",
+            "xi-api-key": apiKey,
           },
           body: JSON.stringify({
             text,

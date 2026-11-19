@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { jsonError } from "@/lib/api-response";
+import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 /**
@@ -8,12 +10,15 @@ import { withMockMode } from "@/lib/with-mock-mode";
  * the question audio starts playing, so video and voice stay aligned.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   return withMockMode(async () => {
+    const owner = await assertOwner(id, request);
+    if (!owner.ok) return owner.response;
+
     const rl = checkRateLimit(`avatar-speak:${id}`, { maxRequests: 30, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
@@ -22,7 +27,7 @@ export async function POST(
       return NextResponse.json({ ok: spoke });
     } catch (error) {
       console.error("Avatar speak failed:", error);
-      return NextResponse.json({ ok: false, error: "Avatar speak failed" }, { status: 502 });
+      return jsonError(502, "AVATAR_UNAVAILABLE", "Avatar speak failed", { ok: false });
     }
   });
 }
