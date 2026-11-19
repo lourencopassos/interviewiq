@@ -1,196 +1,127 @@
 # InterviewIQ
 
-AI-powered mock interview platform. Users paste a job description, the system researches the company, runs an adaptive audio interview through a real-time orchestration pipeline, and produces scored coaching reports with study plans.
+Self-hosted, bring-your-own-keys AI mock interviewer. The user pastes a job description; the app parses it, researches the company, runs an adaptive voice interview (optionally with a D-ID video avatar), and produces a scored coaching report with a study plan.
 
-## Architecture Philosophy
+**[ARCHITECTURE.md](ARCHITECTURE.md) is authoritative** for how the system works. `docs/history/` holds planning-era documents (PRD, phase guides, agent reference): useful background, but they may not match the code. Setup and operator docs are in [README.md](README.md).
 
-The backend is a **real-time orchestrator**, not a simple CRUD API. During an interview, the server coordinates Claude, Whisper, and ElevenLabs through a pipelined architecture that eliminates dead air between questions. The frontend subscribes to Server-Sent Events (SSE) and reacts to events — it never polls or makes sequential fetch chains.
+## Shape of the system
 
-Key architectural decisions:
-- **Server-authoritative state**: Interview progress, scores, and current question live on the server. Zustand mirrors for UI reactivity only.
-- **TTS pre-fetching**: While the user answers question N, the server pre-generates audio for question N+1. If a follow-up is needed (score < 65), the cache is invalidated and new TTS is generated.
-- **SSE event stream**: Single persistent connection per interview session. All state changes flow as typed events.
-- **Service layer in packages/ai**: Heavy logic lives in the AI package, not in API routes. Routes are thin controllers.
+- **One long-lived Node process on localhost** (or behind the operator's own auth proxy) plus Postgres in Docker. Not serverless, not multi-instance: the SSE registry, TTS cache, rate limiter and orchestrator locks live in process memory. No Vercel target.
+- **No authentication.** An anonymous client id (localStorage, mirrored to a cookie) owns each session; `[id]` routes check ownership; middleware rejects cross-site `/api/*` requests.
+- **Real-time orchestrator, not CRUD.** During an interview the server coordinates Claude, Whisper and ElevenLabs and pushes typed events over one SSE connection per session.
+- **Server-authoritative state.** Interview progress lives in Postgres (`Session.status`, `currentIndex`, ordered `Question` rows). Zustand holds UI state only. A refresh recovers from the server.
+- **TTS pre-fetch.** While the user answers question N, audio for N+1 is generated. If the adaptive engine inserts a follow-up (score < 65), the cached clip is invalidated.
 
-## Tech Stack
+## Tech stack
 
-- **Frontend**: Next.js 15 (App Router), Tailwind CSS, shadcn/ui (in apps/web), Zustand (UI state only). Warm-paper light theme by default with a dark toggle; tokens and tile language documented in `docs/design-system.md`
-- **Real-time**: Server-Sent Events (SSE) for interview event streaming
-- **Database**: Prisma with PostgreSQL (Docker Compose for local dev)
-- **AI**: Anthropic Claude (claude-sonnet) for all prompts + web_search tool
-- **Speech-to-Text**: OpenAI Whisper API
-- **Text-to-Speech**: ElevenLabs API (eleven_turbo_v2_5)
-- **Monorepo**: Turborepo
-- **Deployment**: Vercel
-- **Language**: TypeScript throughout
+- Next.js 15 (App Router) + React 19, Tailwind CSS, shadcn-style components in `apps/web/components/ui`
+- Zustand (UI state only), SSE for interview events
+- Prisma + PostgreSQL 16 (Docker Compose, host port 5436, loopback only)
+- Anthropic Claude for all prompts (`CLAUDE_MODEL`, default `claude-sonnet-5`) + `web_search` for company research; coach on `COACH_MODEL` (default `claude-haiku-4-5`)
+- OpenAI Whisper (raw `fetch`, no SDK) for STT; ElevenLabs `eleven_turbo_v2_5` (raw `fetch`) for TTS
+- Optional D-ID Talks streams over WebRTC for the video interviewer
+- Turborepo + pnpm workspaces, TypeScript throughout, Node 20.19+
 
-## Monorepo Structure
+## Layout
 
 ```
-interviewiq/
-├── apps/
-│   └── web/                          # Next.js 15 App Router — frontend + API routes
-│       ├── app/
-│       │   ├── page.tsx              # Landing (/)
-│       │   ├── new/page.tsx          # Setup (/new)
-│       │   ├── interview/[id]/page.tsx # Interview (/interview/[id])
-│       │   ├── api/
-│       │   │   ├── parse-job/        # Job description parsing
-│       │   │   ├── research-company/ # Company intelligence (web search)
-│       │   │   ├── interview/[id]/
-│       │   │   │   ├── stream/       # SSE endpoint (ReadableStream)
-│       │   │   │   ├── answer/       # Audio answer submission (FormData)
-│       │   │   │   └── start/        # Interview initialization
-│       │   │   ├── audio/[blobId]/   # Cached TTS audio serving
-│       │   │   └── sessions/         # Session CRUD + [id] detail
-│       │   └── layout.tsx
-│       ├── components/
-│       │   ├── setup/                # Setup page components
-│       │   ├── interview/            # Interview page components (SSE-driven)
-│       │   └── ui/                   # shadcn/ui base components
-│       ├── hooks/                    # Custom React hooks
-│       │   ├── useInterviewStream.ts # SSE subscription + useReducer
-│       │   ├── useAudioRecorder.ts   # MediaRecorder API wrapper
-│       │   ├── useAudioPlayback.ts   # Audio element wrapper
-│       │   └── useWebcam.ts          # Webcam MediaStream (video mode)
-│       └── lib/
-│           ├── stores/               # Zustand stores (UI state only)
-│           ├── client-id.ts          # Anonymous user UUID
-│           └── utils.ts              # Utility functions
-├── packages/
-│   ├── db/                           # Prisma schema, client, migrations, seed
-│   ├── ai/                           # AI orchestration layer
-│   │   └── src/
-│   │       ├── client.ts             # Claude client wrapper (callClaude, callClaudeWithSearch)
-│   │       ├── prompts/              # All prompt templates
-│   │       │   ├── job-parser.ts
-│   │       │   ├── company-research.ts
-│   │       │   ├── question-generator.ts
-│   │       │   ├── answer-evaluator.ts
-│   │       │   ├── report-generator.ts     # Phase 3
-│   │       │   └── stage-narrator.ts       # Phase 3
-│   │       ├── services/
-│   │       │   ├── interview-orchestrator.ts  # Full interview pipeline + singleton registry
-│   │       │   ├── audio-pipeline.ts          # Whisper STT + ElevenLabs TTS
-│   │       │   ├── avatar-pipeline.ts         # D-ID Talks API (video mode)
-│   │       │   └── adaptive-engine.ts         # Question selection + difficulty
-│   │       ├── cache/
-│   │       │   ├── tts-cache.ts               # Pre-fetched audio + blob store
-│   │       │   └── avatar-cache.ts            # Pre-fetched avatar video (video mode)
-│   │       └── sse/
-│   │           └── emitter.ts                 # SSE connection registry (globalThis singleton)
-│   ├── types/                        # Shared TypeScript interfaces, enums, and Zod schemas
-│   └── ui/                           # shadcn/ui component library
-├── docs/                             # Phase docs (implementation reference)
-├── turbo.json
-├── package.json
-└── .env.example
+apps/web/
+  app/                      pages: / (landing), /new (setup), /interview/[id], /report/[id], /history
+  app/api/
+    parse-job/              job description → structured job (Claude)
+    research-company/       company intel (Claude + web search, cached 7 days per company)
+    sessions/               create/list; [id] GET/PATCH/DELETE; [id]/report GET (200/202/404) + POST regenerate
+    interview/[id]/
+      stream/               SSE (registers, then replays current state)
+      start/                SETUP → BRIEFING → INTERVIEWING, opening + question 1
+      answer/               multipart audio → transcribe → evaluate → next
+      coach/                NDJSON stream from the coach model
+      avatar-offer/         browser asks for a fresh D-ID offer (arrives via SSE)
+      avatar-sdp/ avatar-ice/  WebRTC relay to D-ID
+      avatar-speak/         browser triggers lip-sync when the clip starts playing
+    audio/[blobId]/         serves cached TTS clips
+  components/{setup,interview,report,history,landing,ui}/
+  hooks/                    useInterviewStream (EventSource + useReducer), useAudioRecorder,
+                            useAudioPlayback (FIFO queue), useAvatarStream, useWebcam, useCoach
+  lib/                      i18n/, stores/, client-id.ts, rate-limit.ts, session-owner.ts,
+                            saved-jobs.ts (localStorage postings + CV), mock-mode.ts, with-mock-mode.ts
+packages/ai/src/
+  client.ts                 Claude wrapper (retries, fence stripping, model config)
+  prompts/                  job-parser, company-research, question-generator, answer-evaluator,
+                            report-generator, stage-narrator, coach-explainer (+ language, recover helpers)
+  services/                 interview-orchestrator (+ globalThis registry), adaptive-engine,
+                            audio-pipeline, avatar-stream, coach-service, company-research-service, report-service
+  cache/tts-cache.ts        pre-fetched clips + blob store
+  sse/emitter.ts            Map<sessionId, controller>, globalThis singleton
+  mock/                     fixtures for mock mode
+packages/types/src/         Zod schemas, enums, SSE event union (events.ts)
+packages/db/                Prisma schema, client singleton, seed
+docs/                       design-system.md, FEATURES.md, history/
 ```
 
-## Key Commands
+## Commands
 
 ```bash
-# Development
-pnpm dev                  # Start all apps in dev mode
-pnpm build                # Build all packages and apps
-pnpm lint                 # Lint all packages
-
-# Database (PostgreSQL via Docker)
-pnpm db:up                # Start Postgres container
-pnpm db:down              # Stop Postgres container
-pnpm db:setup             # Start Postgres + push schema (first time)
-pnpm db:push              # Push schema changes
-pnpm db:seed              # Seed sample data
-pnpm db:studio            # Open Prisma Studio
-
-# Individual apps
-pnpm --filter web dev     # Start web app only
-pnpm --filter web build   # Build web app only
+pnpm dev            # web app on http://127.0.0.1:3000
+pnpm build          # production build (only apps/web emits)
+pnpm start          # serve the build on 127.0.0.1
+pnpm lint           # ESLint (apps/web)
+pnpm typecheck      # tsc --noEmit in every workspace
+pnpm test           # node:test suites (packages/ai/test)
+pnpm format:check   # Prettier check (do not mass-format unrelated code)
+pnpm db:setup       # start Postgres (waits for healthcheck) + prisma db push
+pnpm db:up | db:down | db:push | db:seed | db:studio
 ```
 
-## Environment Variables
+The project uses `prisma db push`, not migrations.
 
-```env
-# AI
-ANTHROPIC_API_KEY=         # Claude API for all prompts + web search
-OPENAI_API_KEY=            # Whisper transcription
-ELEVENLABS_API_KEY=        # Text-to-speech
+## Coding conventions
 
-# Database
-DATABASE_URL=              # Prisma connection string (default: postgresql://interviewiq:interviewiq@localhost:5436/interviewiq)
-```
+### API routes (thin controllers)
+- Route Handlers in `apps/web/app/api/**/route.ts`. Validate input with Zod schemas from `packages/types`, apply a rate limit, check ownership on `[id]` routes, then call one function in `packages/ai`. Business logic in a route is a bug.
+- Return `Response.json()` / `NextResponse.json()` for JSON, `new Response(stream)` for SSE/NDJSON.
+- Error responses carry a stable `code`; never forward provider error bodies or stack traces to the client.
+- Wrap handlers that call providers in `withMockMode`.
 
-## Coding Conventions
+### Service layer (`packages/ai`)
+- `InterviewOrchestrator` is the per-session coordinator, obtained via `getOrCreateOrchestrator(sessionId)`. It reloads state from Postgres on each request; in-process state is only locks and caches.
+- `AdaptiveEngine.selectNext` is pure: follow-up when score < 65 (never chained), skip one easy question when score > 88 (same stage only), otherwise next, complete when none remain.
+- Prompts return JSON (except the stage narrator, plain text). Validate with Zod; on failure merge over safe defaults and re-validate. Include "Return ONLY valid JSON" in JSON prompts. Treat user-supplied text (CV, job description, transcript) as data, not instructions.
 
-### API Routes (Thin Controllers)
-- All API routes in `apps/web/app/api/`
-- Use Route Handlers (`route.ts` with GET/POST/PATCH/DELETE exports)
-- Routes are **thin controllers** — they validate input and delegate to services in `packages/ai`
-- Return `Response.json()` for JSON, `new Response()` for streams
-- Validate request body with Zod schemas from `packages/types`
+### SSE events
+Typed in `packages/types/src/events.ts`, shape `{ type, data }`:
+`state_change`, `question_ready`, `audio_ready`, `transcription_complete`, `evaluation_complete`, `transition_text`, `stage_transition`, `interview_complete`, `avatar_stream_ready`, `avatar_stream_audio`, `avatar_stream_failed`, `error`.
+The interview page reacts to these and never polls. The **report page does poll** `GET /api/sessions/[id]/report` (202 while generating).
 
-### Service Layer (packages/ai)
-- All business logic lives in `packages/ai/src/services/`
-- `InterviewOrchestrator` is the central coordinator for interview sessions — stateful per-session instances managed via `getOrCreateOrchestrator(sessionId)` with `globalThis` singleton registry
-- `AudioPipeline` handles Whisper STT (OpenAI SDK) + ElevenLabs TTS (raw fetch, no SDK)
-- `AdaptiveEngine` tracks running scores, inserts follow-ups (score < 65), skips easy questions (score > 88), detects difficulty mismatch after 3+ answers
-- `TTSCache` manages pre-fetched audio with invalidation + in-memory blob store served via `/api/audio/[blobId]`
-- `SSEEmitter` (in `packages/ai/src/sse/emitter.ts`) manages `Map<sessionId, ReadableStreamDefaultController>` — `globalThis` singleton
-- All AI prompts are defined in `packages/ai/src/prompts/` as parameterized templates with Zod validation + fallback recovery
+### Singletons (`globalThis`, survive hot reload)
+`__sseEmitter`, `__orchestrators`, `__ttsCache`, `__rateLimitStore`, `__mockModeStorage`, plus the Prisma client. All assume a single process.
 
-### Real-Time (SSE)
-- Interview page opens a single SSE connection to `/api/interview/[id]/stream`
-- All state changes during an interview flow through SSE events
-- Frontend uses `useInterviewStream` hook (EventSource + useReducer)
-- Event types: `state_change`, `question_ready`, `audio_ready`, `video_ready`, `video_fallback`, `transcription_complete`, `evaluation_complete`, `transition_text`, `interview_complete`, `stage_transition`, `error`
+### Frontend
+- UI must follow [docs/design-system.md](docs/design-system.md): warm paper, JetBrains Mono, pastel tiles, light by default with a dark variant. Tailwind utilities and the component classes in `globals.css`; no new CSS files.
+- Interview components are event-driven (SSE), not locally stateful.
+- Desktop-first, mobile-functional.
 
-### State Management
-- Zustand stores in `apps/web/lib/stores/` — **UI state only**
-- Server is authoritative for interview state (session.status, session.currentIndex)
-- Zustand mirrors server state via SSE events, never drives it
-- If user refreshes mid-interview, state is recovered from server
+### i18n
+- Interface languages `en`, `pt`, `es` (cookie). Dictionaries in `apps/web/lib/i18n/dictionaries/<locale>/<namespace>.ts`.
+- English is the source of truth; `pt` and `es` files are typed `typeof En`, so a missing key fails typecheck. Add every new string to all three.
+- Server components: `getServerDictionary()`. Client components: `useI18n()`.
+- Interview language (`Session.language`: `EN`, `PT_BR`, `ES`) is separate and drives prompts, Whisper and voices.
 
-### Components
-- shadcn/ui as base component library in `packages/ui`
-- App-specific components in `apps/web/components/`
-- Use Tailwind CSS utility classes; shared tile classes (`.tile`, `.tile-pop`, `.sheet`, `.eyebrow`, `.pill`, `.kbd`, `.led`) live in `app/globals.css` and are documented in `docs/design-system.md`
-- Colors come from the paper/ink/pastel tokens so light and dark both work; never hardcode zinc/gray palettes
-- Responsive: desktop-first, mobile-functional
-- Interview components are **event-reactive** (driven by SSE, not local state)
+### Coach
+- `POST /api/interview/[id]/coach` streams NDJSON from `COACH_MODEL` and saves a `CoachNote`. Notes asked before answering are flagged and feed the report's study plan. Pausing is client-side; nothing runs or bills while paused.
 
 ### Database
-- PostgreSQL via Docker Compose (`docker-compose.yml` at root)
-- Prisma schema in `packages/db/prisma/schema.prisma`
-- Models: Session (with clientId, currentIndex, opening, closing), Question (with metadata, strengths, gaps), Report
-- Native Postgres enums: Difficulty, InterviewType, Language, SessionStatus
-- Store JSON data as `@db.Text` strings (JSON.stringify/parse) — used for parsedJob, companyIntel, Question.metadata (GeneratedQuestion), strengths, gaps
-- Anonymous tracking via client UUID in localStorage (no auth for MVP)
-- Run `pnpm db:setup` for first-time setup (starts Docker + pushes schema)
+- Schema: `packages/db/prisma/schema.prisma`. Models: `Session`, `Question`, `CoachNote`, `Report`, `CompanyResearch`.
+- JSON payloads stored as text (`JSON.stringify`/`parse`), shapes owned by Zod schemas in `packages/types`.
+- CVs, transcripts and coach notes are stored in plaintext; there is no automatic purge.
 
-### Singleton Pattern (globalThis)
-Server-side singletons survive Next.js hot reload using the `globalThis` pattern (same as Prisma client):
-- `globalThis.__sseEmitter` — SSE connection registry
-- `globalThis.__orchestrators` — Interview orchestrator instances per session
-- `globalThis.__ttsCache` — TTS audio cache (question pre-fetch + blob store)
+### Mock mode
+Dev-only cookie (`interviewiq_mock_mode`) held in `AsyncLocalStorage`. Covers job parsing, company research (fictional "Northwind Labs"), questions, evaluations, Whisper, TTS (silent clip) and D-ID. Needs no API keys. Ignored in production builds.
 
-### AI Prompts
-- All prompts return JSON (except Stage Transition Narrator which returns plain text)
-- Always include "Return ONLY valid JSON" in system prompts
-- Parse AI responses with try/catch and fallback handling
-- 6 prompts: Job Description Parser, Company Intelligence Research, Question Set Generator, Per-Answer Evaluator, Holistic Report Generator, Stage Transition Narrator
+## Feature backlog
 
-## Feature Backlog
+[`docs/FEATURES.md`](docs/FEATURES.md). When a backlog feature ships, set its status to `Completed` with the date.
 
-Feature ideas and roadmap are tracked in [`docs/FEATURES.md`](docs/FEATURES.md). When a feature from this backlog is completed, update its status to `Completed` and add the completion date.
+## Commits
 
-## Phase Docs
-
-Implementation is split into 5 phases — see `docs/` folder:
-
-1. **[phase-1-foundation.md](docs/phase-1-foundation.md)** — Monorepo setup, DB, job parsing, company research, service layer scaffold
-2. **[phase-2-interview-engine.md](docs/phase-2-interview-engine.md)** — Orchestrator, audio pipeline, SSE streaming, adaptive engine, TTS cache, interview UI
-3. **[phase-3-report-history.md](docs/phase-3-report-history.md)** — Coaching report, session history, Full Loop mode with stage transitions
-4. **[phase-4-video-interview.md](docs/phase-4-video-interview.md)** — Google Meet-like video interview with D-ID avatar, webcam self-view
-5. **[phase-5-polish-launch.md](docs/phase-5-polish-launch.md)** — Landing page, error handling, mobile, deployment
-
-Each phase doc contains prompts, API specs, service implementations, UI components, and checklists.
+Conventional commits with a scope, as in `git log`: `feat(web): …`, `fix(video): …`, `chore(deps): …`, `docs: …`.
