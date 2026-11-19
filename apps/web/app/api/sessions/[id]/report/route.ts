@@ -1,27 +1,18 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@interviewiq/db";
-import {
-  getOrCreateOrchestrator,
-  getReportPayload,
-  type ReportPayload,
-} from "@interviewiq/ai";
+import { ensureReport, getReportPayload, type ReportPayload } from "@interviewiq/ai";
 import { withMockMode } from "@/lib/with-mock-mode";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { errorResponse, jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 
+/** 200 with the report, 202 `{ status }` while it is still being generated, 404 for an unknown session. */
 function toResponse(payload: ReportPayload) {
   switch (payload.kind) {
     case "not_found":
-      return jsonError(404, "NOT_FOUND", "Session not found");
+      return apiError("SESSION_NOT_FOUND");
     case "not_ready":
-      return jsonError(202, "NOT_READY", "Report not yet generated", { status: payload.status });
+      return apiOk({ status: payload.status }, { status: 202 });
     case "ready":
-      return NextResponse.json({
-        report: payload.report,
-        session: payload.session,
-        questions: payload.questions,
-      });
+      return apiOk({ report: payload.report, session: payload.session, questions: payload.questions });
   }
 }
 
@@ -36,8 +27,7 @@ export async function GET(
   try {
     return toResponse(await getReportPayload(id));
   } catch (error) {
-    console.error("Report fetch failed:", error);
-    return jsonError(500, "FAILED", "Failed to fetch report");
+    return apiError(error, { log: "Report fetch failed" });
   }
 }
 
@@ -58,30 +48,10 @@ export async function POST(
     const rl = checkRateLimit(`report:${id}`, { maxRequests: 5, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    const session = await prisma.session.findUnique({
-      where: { id },
-      select: { status: true, report: { select: { id: true } } },
-    });
-    if (!session) {
-      return jsonError(404, "NOT_FOUND", "Session not found");
-    }
-    if (session.report) {
-      return toResponse(await getReportPayload(id));
-    }
-    if (session.status !== "WRAPPING_UP" && session.status !== "COMPLETED") {
-      return jsonError(409, "NOT_FINISHED", `Interview is ${session.status}; finish it before generating a report`);
-    }
-
     try {
-      await getOrCreateOrchestrator(id).generateReport();
-      return toResponse(await getReportPayload(id));
+      return toResponse(await ensureReport(id));
     } catch (error) {
-      console.error("Report regeneration failed:", error);
-      return errorResponse(error, {
-        status: 500,
-        code: "FAILED",
-        error: "Report generation failed. Please try again.",
-      });
+      return apiError(error, { fallback: "REPORT_FAILED", log: "Report regeneration failed" });
     }
   });
 }

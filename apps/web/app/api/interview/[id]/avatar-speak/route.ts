@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
@@ -23,11 +22,9 @@ export async function POST(
     if (!rl.allowed) return rateLimitResponse(rl);
 
     try {
-      const spoke = await getOrCreateOrchestrator(id).speakCurrent();
-      return NextResponse.json({ ok: spoke });
+      return apiOk({ ok: await getOrCreateOrchestrator(id).speakCurrent() });
     } catch (error) {
-      console.error("Avatar speak failed:", error);
-      return jsonError(502, "AVATAR_UNAVAILABLE", "Avatar speak failed", { ok: false });
+      return apiError(error, { fallback: "AVATAR_UNAVAILABLE", log: "Avatar speak failed" });
     }
   });
 }

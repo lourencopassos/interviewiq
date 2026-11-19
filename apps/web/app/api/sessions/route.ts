@@ -1,124 +1,68 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@interviewiq/db";
-import { destroyOrchestrator } from "@interviewiq/ai";
+import { createSession, deleteClientSessions, listSessions, type SessionFilters } from "@interviewiq/ai";
 import { createSessionRequestSchema, Difficulty, InterviewType } from "@interviewiq/types";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { getRequestClientId, readJson } from "@/lib/http";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { withMockMode } from "@/lib/with-mock-mode";
 
+/** Create a draft session (status SETUP) for the setup page. */
 export async function POST(request: Request) {
   return withMockMode(async () => {
     const body = await readJson(request);
-    if (body === null) {
-      return jsonError(400, "INVALID_JSON", "Invalid JSON body");
-    }
+    if (body === null) return apiError("INVALID_JSON");
 
     const parsed = createSessionRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return jsonError(400, "INVALID_REQUEST", "Invalid request", { details: parsed.error.flatten() });
-    }
+    if (!parsed.success) return apiError("INVALID_REQUEST");
 
     const rl = checkRateLimit(`sessions:${parsed.data.clientId}`, { maxRequests: 20, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
     try {
-      const session = await prisma.session.create({
-        data: {
-          clientId: parsed.data.clientId,
-          jobTitle: parsed.data.jobTitle,
-          companyName: parsed.data.companyName,
-          jobDescription: parsed.data.jobDescription,
-          difficulty: parsed.data.difficulty,
-          interviewType: parsed.data.interviewType,
-          language: parsed.data.language,
-          videoMode: parsed.data.videoMode ?? false,
-          coachEnabled: parsed.data.coachEnabled ?? true,
-          resumeText: parsed.data.resumeText,
-          parsedJob: parsed.data.parsedJob,
-          companyIntel: parsed.data.companyIntel,
-          status: "SETUP",
-        },
-        select: { id: true, status: true, createdAt: true },
-      });
-
-      return NextResponse.json(session, { status: 201 });
+      return apiOk(await createSession(parsed.data), { status: 201 });
     } catch (error) {
-      console.error("Session creation failed:", error);
-      return jsonError(500, "FAILED", "Failed to create session");
+      return apiError(error, { log: "Session creation failed" });
     }
   });
 }
 
-const DIFFICULTIES = new Set<string>(Object.values(Difficulty));
-const INTERVIEW_TYPES = new Set<string>(Object.values(InterviewType));
+const isDifficulty = (value: string): value is Difficulty => value in Difficulty;
+const isInterviewType = (value: string): value is InterviewType => value in InterviewType;
 
-/**
- * List the caller's sessions, newest first, in every status. Drafts (SETUP)
- * and abandoned sessions are included so the CV they hold can be deleted.
- */
+/** Optional `?difficulty=&interviewType=` filters; null when either value is not a known enum member. */
+function readFilters(params: URLSearchParams): SessionFilters | null {
+  const difficulty = params.get("difficulty") || undefined;
+  const interviewType = params.get("interviewType") || undefined;
+  if (difficulty !== undefined && !isDifficulty(difficulty)) return null;
+  if (interviewType !== undefined && !isInterviewType(interviewType)) return null;
+  return { difficulty, interviewType };
+}
+
+/** List the caller's sessions, newest first, optionally filtered by difficulty and type. */
 export async function GET(request: Request) {
   const clientId = getRequestClientId(request);
-  if (!clientId) {
-    return jsonError(400, "CLIENT_ID_REQUIRED", "A client id is required");
-  }
+  if (!clientId) return apiError("CLIENT_ID_REQUIRED");
 
-  const { searchParams } = new URL(request.url);
-  const difficulty = searchParams.get("difficulty");
-  const interviewType = searchParams.get("interviewType");
-
-  if (difficulty && !DIFFICULTIES.has(difficulty)) {
-    return jsonError(400, "INVALID_REQUEST", "Invalid difficulty filter");
-  }
-  if (interviewType && !INTERVIEW_TYPES.has(interviewType)) {
-    return jsonError(400, "INVALID_REQUEST", "Invalid interviewType filter");
-  }
+  const filters = readFilters(new URL(request.url).searchParams);
+  if (!filters) return apiError("INVALID_REQUEST");
 
   try {
-    const sessions = await prisma.session.findMany({
-      where: {
-        clientId,
-        ...(difficulty ? { difficulty: difficulty as Difficulty } : {}),
-        ...(interviewType ? { interviewType: interviewType as InterviewType } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        createdAt: true,
-        jobTitle: true,
-        companyName: true,
-        difficulty: true,
-        interviewType: true,
-        status: true,
-        report: { select: { overallScore: true } },
-      },
-    });
-
-    return NextResponse.json(sessions);
+    return apiOk(await listSessions(clientId, filters));
   } catch (error) {
-    console.error("Session list failed:", error);
-    return jsonError(500, "FAILED", "Failed to fetch sessions");
+    return apiError(error, { log: "Session list failed" });
   }
 }
 
 /** Delete every session (with its questions, coach notes and report) owned by the caller. */
 export async function DELETE(request: Request) {
   const clientId = getRequestClientId(request);
-  if (!clientId) {
-    return jsonError(400, "CLIENT_ID_REQUIRED", "A client id is required");
-  }
+  if (!clientId) return apiError("CLIENT_ID_REQUIRED");
 
   const rl = checkRateLimit(`sessions-delete:${clientId}`, { maxRequests: 5, windowMs: 60_000 });
   if (!rl.allowed) return rateLimitResponse(rl);
 
   try {
-    const sessions = await prisma.session.findMany({ where: { clientId }, select: { id: true } });
-    // Stop live work (avatar streams, cached audio) before the rows disappear.
-    await Promise.all(sessions.map((s) => destroyOrchestrator(s.id).catch(() => undefined)));
-    const { count } = await prisma.session.deleteMany({ where: { clientId } });
-    return NextResponse.json({ deleted: count });
+    return apiOk({ deleted: await deleteClientSessions(clientId) });
   } catch (error) {
-    console.error("Bulk session delete failed:", error);
-    return jsonError(500, "FAILED", "Failed to delete sessions");
+    return apiError(error, { log: "Bulk session delete failed" });
   }
 }

@@ -2,7 +2,6 @@ import { randomUUID } from "crypto";
 import { AudioPipeline } from "../services/audio-pipeline";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ttsCache: TTSCache | undefined;
 }
 

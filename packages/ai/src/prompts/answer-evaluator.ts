@@ -8,6 +8,7 @@ import { callClaude } from "../client";
 import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
 import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
+import { fallbacksFor } from "../i18n/fallbacks";
 
 function buildSystemPrompt(params: {
   companyName: string;
@@ -86,7 +87,7 @@ export async function evaluateAnswer(params: {
       {
         score: 50,
         tier: "good",
-        shortFeedback: "Thank you for your answer. Let's continue.",
+        shortFeedback: fallbacksFor(params.language).evaluatorFeedback,
         followUpNeeded: false,
         followUp: null,
         keyStrengths: [],

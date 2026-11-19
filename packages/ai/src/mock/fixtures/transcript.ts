@@ -15,7 +15,6 @@ const MOCK_TRANSCRIPTS: string[] = [
 
 // Per-session counter to rotate through transcripts
 declare global {
-  // eslint-disable-next-line no-var
   var __mockTranscriptCounter: Map<string, number> | undefined;
 }
 

@@ -117,20 +117,20 @@ With a D-ID key and a video session, the **browser requests an offer on demand**
 
 ## SSE event protocol
 
-All events share the shape `{ type, data }` and are typed in `packages/types/src/events.ts`:
+All events share the shape `{ type, data }`. `interviewEventSchema` in `packages/types/src/events.ts` is the single source: the server builds events against its inferred `InterviewEvent` type (`packages/ai/src/interview/events.ts`) and the client validates incoming payloads with it:
 
 | Event | When |
 |---|---|
 | `state_change` | Session status changed, and on every connect |
-| `question_ready` | A question is current. Carries id, text, category, `order`, `total`, `isFollowUp` |
+| `question_ready` | A question is current. Carries id, text, category, `order`, `total`, `stage` (Full Loop, else null), `isFollowUp` |
 | `audio_ready` | The clip for that question can be played |
 | `transcription_complete` | Whisper finished |
 | `evaluation_complete` | Score and tier for the answer |
 | `transition_text` | One sentence of spoken feedback, or the closing |
-| `stage_transition` | Full Loop stage boundary, with narration audio |
+| `stage_transition` | Full Loop stage boundary: `completedStage` / `nextStage` as `InterviewStage` enums (completed is null for the opening intro), with narration audio |
 | `interview_complete` | Redirect to the report |
 | `avatar_stream_ready` / `avatar_stream_audio` / `avatar_stream_failed` | Video mode lifecycle |
-| `error` | `{ code, message, retryable }` |
+| `error` | `{ code: ErrorCode, retryable, message? }`. Localize by `code`; `message` is an English fallback for logs |
 
 ## Prompts
 
@@ -196,7 +196,8 @@ What this means for hosting:
 
 | Concern | File |
 |---|---|
-| Interview lifecycle | `packages/ai/src/services/interview-orchestrator.ts` |
+| Interview lifecycle | `packages/ai/src/interview/orchestrator.ts` (state machine) and its collaborators in `packages/ai/src/interview/` |
+| Errors | `packages/ai/src/errors.ts` (`AppError`), `apps/web/lib/api-response.ts` (`apiError`), `packages/types/src/errors.ts` (`ErrorCode`) |
 | Next-question rules | `packages/ai/src/services/adaptive-engine.ts` |
 | Audio pre-fetch and serving | `packages/ai/src/cache/tts-cache.ts`, `apps/web/app/api/audio/[blobId]/route.ts` |
 | SSE connections | `packages/ai/src/sse/emitter.ts`, `apps/web/app/api/interview/[id]/stream/route.ts` |
@@ -205,4 +206,4 @@ What this means for hosting:
 | Report assembly | `packages/ai/src/services/report-service.ts` |
 | Mock mode | `packages/ai/src/mock/`, `apps/web/lib/with-mock-mode.ts` |
 | Ownership and rate limits | `apps/web/lib/session-owner.ts`, `apps/web/lib/rate-limit.ts`, `apps/web/middleware.ts` |
-| Video avatar | `packages/ai/src/services/avatar-stream.ts`, `apps/web/hooks/useAvatarStream.ts` |
+| Video avatar | `packages/ai/src/services/avatar-stream.ts`, `packages/ai/src/interview/avatar-relay.ts`, `apps/web/hooks/useAvatarStream.ts` |

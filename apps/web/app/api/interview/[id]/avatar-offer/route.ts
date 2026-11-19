@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
 import { getOrCreateOrchestrator } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { jsonError } from "@/lib/api-response";
+import { apiError, apiOk } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
@@ -24,11 +23,9 @@ export async function POST(
     if (!rl.allowed) return rateLimitResponse(rl);
 
     try {
-      const ok = await getOrCreateOrchestrator(id).requestAvatarOffer();
-      return NextResponse.json({ ok });
+      return apiOk({ ok: await getOrCreateOrchestrator(id).requestAvatarOffer() });
     } catch (error) {
-      console.error("Avatar offer failed:", error);
-      return jsonError(502, "AVATAR_UNAVAILABLE", "Could not create an avatar stream", { ok: false });
+      return apiError(error, { fallback: "AVATAR_UNAVAILABLE", log: "Avatar offer failed" });
     }
   });
 }

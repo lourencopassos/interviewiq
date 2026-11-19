@@ -96,6 +96,21 @@ In development (`pnpm dev`) a small toggle appears in the bottom-left corner of 
 
 Mock mode is a cookie scoped to your browser and is ignored in production builds.
 
+## Run with Docker
+
+To run the production build in a container instead of `pnpm dev`:
+
+```bash
+cp .env.example apps/web/.env.local                # if you have not already; add your API keys
+docker compose --env-file apps/web/.env.local --profile app up -d --build   # http://localhost:3000
+```
+
+- **Env:** `--env-file apps/web/.env.local` passes your keys to the `app` container at runtime; they are never copied into the image. `DATABASE_URL` is overridden to point at the `db` service, so the container uses the same Postgres (and data) as `pnpm dev`.
+- **Schema:** a one-shot `migrate` service runs `prisma db push` before the app starts.
+- **Port and host:** published on `127.0.0.1` only. `APP_PORT=3300 docker compose --env-file apps/web/.env.local --profile app up -d` changes the host port. It is still a single-user app with no login, so the same rules as [Security and privacy](#security-and-privacy) apply.
+- **Stop:** `docker compose --profile app down` (add `-v` only if you also want to delete the database volume). Plain `docker compose up` / `pnpm db:up` still start only Postgres.
+- Mock mode is disabled in production builds, so the container needs real API keys.
+
 ## Costs
 
 Every real interview calls paid APIs on your accounts. These are **rough estimates**; actual cost depends on the provider prices at the time, your plans, the model you pick and how long you talk.
@@ -148,7 +163,7 @@ docs/             Design system, feature backlog, and docs/history (planning-era
 
 ## Running it somewhere other than your laptop
 
-The only supported shape is **one long-lived Node process** (`pnpm build && pnpm start`, or Next's standalone output) next to Postgres, on localhost or behind your own authenticating reverse proxy. Live SSE connections, generated audio clips, rate-limit counters and interview locks live in process memory. Interview state itself is always in Postgres, so a restart is safe: the browser reconnects and the current question is replayed.
+The only supported shape is **one long-lived Node process** (`pnpm build && pnpm start`, or the Docker image from [Run with Docker](#run-with-docker), which serves Next's standalone output) next to Postgres, on localhost or behind your own authenticating reverse proxy. Live SSE connections, generated audio clips, rate-limit counters and interview locks live in process memory. Interview state itself is always in Postgres, so a restart is safe: the browser reconnects and the current question is replayed.
 
 That design does **not** fit multi-instance or serverless hosting (for example Vercel functions), where the SSE stream, the answer upload and the audio fetch can land on different instances.
 

@@ -10,7 +10,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 declare global {
-  // eslint-disable-next-line no-var
   var __mockModeStorage: AsyncLocalStorage<{ mock: boolean }> | undefined;
 }
 

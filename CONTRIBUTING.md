@@ -21,10 +21,10 @@ You do not need API keys to work on most of the app. In `pnpm dev`, switch on th
 
 ## Conventions
 
-- **Keep routes thin.** A route handler validates input (Zod schemas from `packages/types`), applies a rate limit, checks session ownership, and calls one function in `packages/ai`. Business logic belongs in `packages/ai/src/services`.
+- **Keep routes thin.** A route handler validates input (Zod schemas from `packages/types`), applies a rate limit, checks session ownership, and calls one function in `packages/ai`. Business logic belongs in `packages/ai/src` (`interview/` for the live interview, `services/` for the rest).
 - **Server-authoritative state.** Interview state lives in Postgres and reaches the browser as SSE events; Zustand is for UI state only.
 - **Single process.** In-memory singletons (SSE registry, TTS cache, rate limiter, orchestrator locks) assume one Node process. Do not add features that need more than one without discussing it first.
-- **No secrets or provider internals to the client.** Errors returned to the browser use a stable `code` and a generic message; details go to the server log.
+- **No secrets or provider internals to the client.** Throw `AppError` with a code from `ErrorCode` (`packages/types`); routes answer with `apiError(err)`, which returns `{ error: { code, message, retryable } }`. The browser localizes by `code`; details go to the server log.
 - **Prompts** return JSON validated with Zod, with fallbacks. Treat CVs, job descriptions and transcripts as untrusted data.
 - Database changes: edit `packages/db/prisma/schema.prisma` and run `pnpm db:push` (the project uses `db push`, not migrations).
 - Formatting: Prettier config is in the repo. Format the files you touch; do not reformat unrelated code in the same PR.

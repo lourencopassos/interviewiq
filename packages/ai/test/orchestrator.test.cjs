@@ -13,7 +13,7 @@ const { sseEmitter } = require("../src/sse/emitter");
 const {
   InterviewOrchestrator,
   getOrCreateOrchestrator,
-} = require("../src/services/interview-orchestrator");
+} = require("../src/interview");
 
 const QUESTION_COUNT = mockQuestionSet.questions.length; // 6
 // Indices into the mock evaluation rotation (src/mock/fixtures/evaluation.ts).
@@ -316,4 +316,49 @@ test("resume on COMPLETED only replays the completion redirect", async (t) => {
   await ctx.mock(() => getOrCreateOrchestrator(ctx.sessionId).resume());
   assert.deepEqual(ctx.types(), ["state_change", "interview_complete"]);
   assert.deepEqual(ctx.events[0].data, { status: "COMPLETED" });
+});
+
+test("Full Loop sends stage enums and every emitted event matches the client schema", async (t) => {
+  const { interviewEventSchema } = require("@interviewiq/types");
+  const ctx = setup(t, { interviewType: "FULL_LOOP", language: "PT_BR" });
+  const orchestrator = getOrCreateOrchestrator(ctx.sessionId);
+  assert.equal(await ctx.mock(() => orchestrator.startInterview()), "started");
+
+  assert.deepEqual(ctx.types(), ["state_change", "stage_transition", "question_ready", "audio_ready"]);
+  assert.deepEqual(ctx.events[1].data, {
+    completedStage: null,
+    stageScore: 0,
+    nextStage: "PHONE_SCREEN",
+    transitionAudioUrl: null,
+  });
+  assert.equal(ctx.events[2].data.stage, "PHONE_SCREEN");
+
+  const phoneScreen = ctx.questions().filter((q) => q.stage === "PHONE_SCREEN").length;
+  for (let i = 0; i < phoneScreen; i++) {
+    pinEvaluation(EVAL_78);
+    await ctx.mock(() => orchestrator.handleAnswer(AUDIO));
+  }
+
+  const boundary = ctx.events.filter((e) => e.type === "stage_transition").at(-1);
+  assert.equal(boundary.data.completedStage, "PHONE_SCREEN");
+  assert.equal(boundary.data.nextStage, "TECHNICAL");
+  assert.equal(boundary.data.stageScore, 78);
+  assert.match(boundary.data.transitionAudioUrl, /^\/api\/audio\//);
+  assert.equal(ctx.events.at(-2).data.stage, "TECHNICAL");
+
+  for (const event of ctx.events) {
+    const result = interviewEventSchema.safeParse(event);
+    assert.ok(result.success, `${event.type}: ${result.success ? "" : result.error.message}`);
+  }
+});
+
+test("the closing falls back to the session language when none was generated", async (t) => {
+  const ctx = await started(t, { language: "ES" });
+  ctx.session().closing = null;
+  for (let i = 0; i < QUESTION_COUNT; i++) {
+    pinEvaluation(EVAL_78);
+    await ctx.mock(() => ctx.orchestrator.handleAnswer(AUDIO));
+  }
+  const closing = ctx.events.filter((e) => e.type === "transition_text").at(-1);
+  assert.equal(closing.data.message, "Con esto terminamos la entrevista. Gracias por tu tiempo hoy.");
 });

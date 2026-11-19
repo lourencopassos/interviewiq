@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ErrorCode } from "./errors";
 
 export const CoachSource = {
   QUESTION: "question",
@@ -39,4 +40,4 @@ export interface CoachNoteView {
 export type CoachStreamEvent =
   | { type: "delta"; text: string }
   | { type: "done"; note: CoachNoteView }
-  | { type: "error"; code: string; message: string };
+  | { type: "error"; code: ErrorCode; message: string };

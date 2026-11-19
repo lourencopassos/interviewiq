@@ -28,12 +28,12 @@ export class AvatarStreamError extends Error {
 }
 
 /** Minimal WebRTC types for Node.js context (full types live in the browser). */
-interface SDPDescriptionInit {
+export interface SDPDescriptionInit {
   type: string;
   sdp?: string;
 }
 
-interface ICECandidateInit {
+export interface ICECandidateInit {
   candidate?: string;
   sdpMid?: string | null;
   sdpMLineIndex?: number | null;
@@ -301,9 +301,5 @@ export class AvatarStream {
 
   get isActive(): boolean {
     return this.streamId !== null;
-  }
-
-  get currentStreamId(): string | null {
-    return this.streamId;
   }
 }
