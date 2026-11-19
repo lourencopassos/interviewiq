@@ -63,10 +63,8 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
     session.interviewType.replace(/_/g, " ")
   ).toLocaleLowerCase(localeTag);
   const statusLabel = (
-    session.status === "RESEARCHING"
-      ? copy.researching
-      : ((t.common.status as Record<string, string>)[session.status] ??
-        session.status.replace(/_/g, " "))
+    (t.common.status as Record<string, string>)[session.status] ??
+    session.status.replace(/_/g, " ")
   ).toLocaleLowerCase(localeTag);
 
   const canResume = RESUMABLE_STATUSES.has(session.status);

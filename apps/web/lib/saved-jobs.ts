@@ -1,10 +1,14 @@
 import { z } from "zod";
-import { companyIntelligenceSchema, parsedJobSchema } from "@interviewiq/types";
+import {
+  companyIntelligenceSchema,
+  JOB_DESCRIPTION_MIN_LENGTH,
+  parsedJobSchema,
+} from "@interviewiq/types";
 
 const jobPrefix = "interviewiq.saved-job.";
 export const draftKey = "interviewiq.job-draft";
 export const jobSchema = z.object({
-  jobDescription: z.string().min(50),
+  jobDescription: z.string().min(JOB_DESCRIPTION_MIN_LENGTH),
   parsedJob: parsedJobSchema,
   companyIntel: companyIntelligenceSchema.nullable(),
 });

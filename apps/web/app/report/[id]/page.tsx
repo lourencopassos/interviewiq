@@ -28,8 +28,6 @@ interface ReportData {
     interviewType: string;
     language: string;
     status: string;
-    /** Not part of the payload today; rendered in the title strip when present. */
-    createdAt?: string;
     /** Whether the in-interview coach was available. Older payloads omit it (treated as on). */
     coachEnabled?: boolean;
   };
@@ -79,14 +77,6 @@ type ViewState =
   | { kind: "ready"; data: ReportData }
   | { kind: "not_found" }
   | { kind: "error"; message: ErrorMessage };
-
-function formatDate(iso: string, localeTag: string): string {
-  return new Date(iso).toLocaleDateString(localeTag, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
@@ -332,13 +322,7 @@ export default function ReportPage() {
           {session.coachEnabled === false && (
             <span className="pill bg-transparent text-muted-foreground">{t.report.coach.coachOff}</span>
           )}
-          {session.createdAt ? (
-            <span className="pill bg-card tabular-nums">
-              {formatDate(session.createdAt, localeTag)}
-            </span>
-          ) : (
-            <span className="pill bg-card">{languageLabel}</span>
-          )}
+          <span className="pill bg-card">{languageLabel}</span>
         </div>
       </header>
 
@@ -402,7 +386,7 @@ export default function ReportPage() {
       )}
 
       {/* Actions */}
-      <ReportActions sessionId={session.id} />
+      <ReportActions />
     </div>
   );
 }

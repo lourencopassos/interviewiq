@@ -4,13 +4,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSetupStore } from "@/lib/stores/setup-store";
 import { useI18n, interpolate, LOCALE_TAGS } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { JOB_DESCRIPTION_MIN_LENGTH } from "@interviewiq/types";
 
 export function JobDescriptionInput() {
   const { t, locale } = useI18n();
   const { jobDescription, setJobDescription, step } = useSetupStore();
   const disabled = step !== "input" && step !== "error";
   const charCount = jobDescription.length;
-  const minChars = 50;
+  const minChars = JOB_DESCRIPTION_MIN_LENGTH;
   const ready = charCount >= minChars;
   const remaining = minChars - charCount;
 

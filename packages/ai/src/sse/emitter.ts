@@ -17,7 +17,7 @@ const encoder = new TextEncoder();
  * Registry of live SSE connections, one per session.
  *
  * Process-local: fine for a single long-lived Node server, not for
- * multi-instance serverless (see FIXES.md D1).
+ * multi-instance serverless (see "Process model and deployment" in ARCHITECTURE.md).
  */
 export class SSEEmitter {
   private connections: Map<string, Connection> = new Map();
@@ -66,10 +66,6 @@ export class SSEEmitter {
       // Connection closed — clean up
       this.teardown(sessionId, connection);
     }
-  }
-
-  isConnected(sessionId: string): boolean {
-    return this.connections.has(sessionId);
   }
 
   private teardown(sessionId: string, connection: Connection): void {

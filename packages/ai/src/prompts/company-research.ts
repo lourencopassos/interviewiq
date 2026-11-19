@@ -32,7 +32,8 @@ Return ONLY valid JSON. Be specific and factual — no hallucinations. If you ca
 The role's key skills arrive inside <key_skills> tags. ${DATA_ONLY_INSTRUCTION}`;
 }
 
-const EMPTY_INTELLIGENCE: CompanyIntelligence = {
+/** Fallback when research fails or finds nothing; interviews proceed without it. */
+export const EMPTY_INTELLIGENCE: CompanyIntelligence = {
   companySize: null,
   fundingStage: null,
   techStack: [],

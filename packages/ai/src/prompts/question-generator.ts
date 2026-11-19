@@ -1,4 +1,5 @@
 import {
+  QUESTION_COUNT,
   questionSetSchema,
   type QuestionSet,
   type ParsedJob,
@@ -30,13 +31,6 @@ const questionSetResponse = questionSetSchema.extend({
     questionSetSchema.shape.questions,
   ),
 });
-
-const QUESTION_COUNT: Record<Difficulty, number> = {
-  JUNIOR: 5,
-  MID: 6,
-  SENIOR: 7,
-  STAFF: 8,
-};
 
 interface QuestionSetParams {
   companyName: string;

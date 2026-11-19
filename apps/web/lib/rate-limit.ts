@@ -39,7 +39,7 @@ export interface RateLimitResult {
 
 /**
  * Fixed-window in-memory limiter. Per-process only — adequate for a single
- * Node server, not for multi-instance serverless (see FIXES.md D1).
+ * Node server, not for multi-instance serverless (see "Process model and deployment" in ARCHITECTURE.md).
  */
 export function checkRateLimit(key: string, options: RateLimitOptions): RateLimitResult {
   const now = Date.now();

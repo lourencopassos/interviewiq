@@ -3,7 +3,6 @@ import {
   FULL_LOOP_STAGES,
   parsedJobSchema,
   companyIntelligenceSchema,
-  type GeneratedQuestion,
   type ParsedJob,
   type CompanyIntelligence,
   type CoachingReport,
@@ -26,6 +25,7 @@ import { evaluateAnswer } from "../prompts/answer-evaluator";
 import { generateCoachingReport } from "../prompts/report-generator";
 import { generateStageTransition } from "../prompts/stage-narrator";
 import { isString, parseJsonArray } from "../utils/json";
+import { parseQuestionMeta, type QuestionMeta } from "../utils/question-meta";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -60,14 +60,9 @@ function avatarFailure(error: unknown): { code: AvatarFailureCode; reason: strin
   return { code, reason: AVATAR_FAILURE_REASON[code] };
 }
 
-/** Shape we persist in Question.metadata (a GeneratedQuestion plus runtime flags). */
-interface QuestionMeta extends Partial<GeneratedQuestion> {
-  isFollowUp?: boolean;
-  parentQuestionId?: string;
-}
-
 /** A question as loaded from the DB — the single source of truth during an interview. */
 interface RuntimeQuestion extends AdaptiveQuestion {
+  stage: InterviewStage | null;
   order: number;
   text: string;
   category: string;
@@ -89,29 +84,19 @@ const DEFAULT_SCORING_GUIDE = {
   excellent: "Outstanding answer",
 };
 
-function parseMeta(raw: string | null): QuestionMeta {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
 function toRuntime(q: {
   id: string;
   order: number;
   text: string;
   category: string;
-  stage: string | null;
+  stage: InterviewStage | null;
   metadata: string | null;
   score: number | null;
   transcript: string | null;
   strengths: string | null;
   gaps: string | null;
 }): RuntimeQuestion {
-  const meta = parseMeta(q.metadata);
+  const meta = parseQuestionMeta(q.metadata);
   return {
     id: q.id,
     order: q.order,
@@ -236,7 +221,7 @@ export class InterviewOrchestrator {
    * triggered by the client (POST /avatar-speak) when the audio actually starts,
    * so lips and voice line up and nothing is spoken into a half-open connection.
    */
-  private async emitAudioAndStream(
+  private async emitAudioReady(
     questionId: string,
     audioUrl: string,
     spokenText: string | null,
@@ -330,7 +315,7 @@ export class InterviewOrchestrator {
         session.language,
         options.prefixText ? undefined : question.id,
       );
-      await this.emitAudioAndStream(question.id, audioUrl, spokenText);
+      await this.emitAudioReady(question.id, audioUrl, spokenText);
     } catch (error) {
       // Audio is a nicety; the interview continues with the written question.
       console.warn(`TTS failed for question ${question.id}:`, error);
@@ -360,9 +345,7 @@ export class InterviewOrchestrator {
         this.avatarStream = null;
       }
       this.avatarStream = new AvatarStream(session.language);
-      const streamSession = await this.avatarStream.createStream(
-        session.avatarImageUrl ?? undefined,
-      );
+      const streamSession = await this.avatarStream.createStream();
       this.emit({
         type: "avatar_stream_ready",
         data: {
@@ -424,7 +407,7 @@ export class InterviewOrchestrator {
         return "resumed";
       }
       // BRIEFING with no generation running in this process means a previous
-      // attempt crashed mid-way (or another process is generating — see FIXES.md D1).
+      // attempt crashed mid-way (or another process is generating — see ARCHITECTURE.md).
       // Reclaim it so the user isn't stuck.
       claimed = await prisma.session.updateMany({
         where: { id: this.sessionId, status: "BRIEFING" },
@@ -837,7 +820,6 @@ export class InterviewOrchestrator {
     const transitionText = await generateStageTransition({
       companyName: session.companyName,
       jobTitle: session.jobTitle,
-      completedStage: (current.stage ?? "TECHNICAL") as InterviewStage,
       completedStageLabel: completedLabel,
       completedStageScore: stageScore,
       nextStageLabel: nextLabel,
@@ -889,7 +871,7 @@ export class InterviewOrchestrator {
         closingText,
         session.language,
       );
-      await this.emitAudioAndStream(lastQuestion.id, audioUrl, closingText);
+      await this.emitAudioReady(lastQuestion.id, audioUrl, closingText);
     } catch (error) {
       console.warn("Closing TTS failed, continuing to report:", error);
     }
@@ -1045,17 +1027,6 @@ export class InterviewOrchestrator {
     ttsCache.clearSession(this.sessionId);
   }
 
-  async getState(): Promise<{ status: string; currentIndex: number; totalQuestions: number }> {
-    const session = await prisma.session.findUniqueOrThrow({
-      where: { id: this.sessionId },
-      include: { _count: { select: { questions: true } } },
-    });
-    return {
-      status: session.status,
-      currentIndex: session.currentIndex,
-      totalQuestions: session._count.questions,
-    };
-  }
 }
 
 export function getOrCreateOrchestrator(sessionId: string): InterviewOrchestrator {

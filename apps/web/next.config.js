@@ -16,7 +16,6 @@ const noStore = [{ key: "Cache-Control", value: "no-store" }];
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
-    "@interviewiq/ui",
     "@interviewiq/db",
     "@interviewiq/types",
     "@interviewiq/ai",

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSetupStore } from "@/lib/stores/setup-store";
 import { useI18n, interpolate, defaultInterviewLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { Difficulty, InterviewType, Language } from "@interviewiq/types";
+import { QUESTION_COUNT, type Difficulty, type InterviewType, type Language } from "@interviewiq/types";
 
 interface Option<T extends string> {
   value: T;
@@ -15,13 +15,6 @@ interface Option<T extends string> {
 
 /** Store default; the UI-locale default only applies while this is untouched. */
 const INITIAL_LANGUAGE: Language = "EN";
-
-const QUESTION_COUNT: Record<Difficulty, number> = {
-  JUNIOR: 5,
-  MID: 6,
-  SENIOR: 7,
-  STAFF: 8,
-};
 
 interface OptionTilesProps<T extends string> {
   label: string;

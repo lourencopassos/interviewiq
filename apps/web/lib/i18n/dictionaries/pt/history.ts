@@ -17,7 +17,6 @@ export const history: typeof En = {
   },
   card: {
     outOf: "/100",
-    researching: "pesquisando",
     resume: "Retomar",
     report: "Relatório",
     retake: "Refazer",

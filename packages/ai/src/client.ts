@@ -72,7 +72,7 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       const { retry, waitMs } = isRetryable(error);
       if (!retry || attempt === MAX_RETRIES) throw error;
       const backoff = waitMs * Math.pow(1.5, attempt);
-      console.log(
+      console.warn(
         `[AI] Transient error, waiting ${Math.round(backoff / 1000)}s before retry ${attempt + 1}/${MAX_RETRIES}`,
       );
       await delay(backoff);
@@ -127,7 +127,6 @@ export async function callClaude(
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(300);
-    console.log("[MOCK] callClaude — returning fixture");
     return getMockJsonResponse(systemPrompt);
   }
 
@@ -174,7 +173,6 @@ export async function callClaudeWithSearch(
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(400);
-    console.log("[MOCK] callClaudeWithSearch — returning fixture");
     return getMockJsonResponse(systemPrompt);
   }
 
@@ -214,7 +212,6 @@ export async function callClaudePlainText(
 ): Promise<string> {
   if (isMockMode()) {
     await delay(250);
-    console.log("[MOCK] callClaudePlainText — returning fixture");
     return getMockStageTransition();
   }
 

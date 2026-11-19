@@ -1,10 +1,10 @@
 // Client-side mock mode helpers — reads/writes the cookie that controls mock mode.
 
-const COOKIE_NAME = "interviewiq_mock_mode";
+export const MOCK_MODE_COOKIE = "interviewiq_mock_mode";
 
 export function getMockMode(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.includes(`${COOKIE_NAME}=true`);
+  return document.cookie.includes(`${MOCK_MODE_COOKIE}=true`);
 }
 
 export function setMockModeClient(enabled: boolean): void {
@@ -12,10 +12,10 @@ export function setMockModeClient(enabled: boolean): void {
 
   if (enabled) {
     // Set cookie with long expiry, SameSite=Lax for dev
-    document.cookie = `${COOKIE_NAME}=true; path=/; max-age=31536000; SameSite=Lax`;
+    document.cookie = `${MOCK_MODE_COOKIE}=true; path=/; max-age=31536000; SameSite=Lax`;
   } else {
     // Delete cookie
-    document.cookie = `${COOKIE_NAME}=; path=/; max-age=0`;
+    document.cookie = `${MOCK_MODE_COOKIE}=; path=/; max-age=0`;
   }
 }
 

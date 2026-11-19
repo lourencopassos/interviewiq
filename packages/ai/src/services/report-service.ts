@@ -7,6 +7,7 @@ import {
   type CoachNoteView,
 } from "@interviewiq/types";
 import { isString, parseJsonArray, parseJsonObject } from "../utils/json";
+import { toCoachNoteView } from "./coach-service";
 
 export interface ReportQuestionView {
   id: string;
@@ -125,17 +126,7 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
   const notesByQuestion = new Map<string, CoachNoteView[]>();
   for (const n of session.coachNotes) {
     if (!n.questionId) continue;
-    const view: CoachNoteView = {
-      id: n.id,
-      questionId: n.questionId,
-      source: n.source as CoachNoteView["source"],
-      selection: n.selection,
-      prompt: n.prompt,
-      answer: n.answer,
-      askedBeforeAnswer: n.askedBeforeAnswer,
-      model: n.model,
-      createdAt: n.createdAt.toISOString(),
-    };
+    const view = toCoachNoteView(n);
     notesByQuestion.set(n.questionId, [...(notesByQuestion.get(n.questionId) ?? []), view]);
   }
 

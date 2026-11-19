@@ -7,3 +7,4 @@ export * from "./report";
 export * from "./events";
 export * from "./avatar";
 export * from "./coach";
+export * from "./audio";

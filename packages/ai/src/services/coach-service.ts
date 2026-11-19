@@ -1,19 +1,17 @@
 import { prisma } from "@interviewiq/db";
-import type { CoachNoteView, CoachRequest, Language } from "@interviewiq/types";
+import type { CoachNoteView, CoachRequest, CoachSource, Language } from "@interviewiq/types";
 import { COACH_MODEL, streamClaudeText } from "../client";
 import { isMockMode } from "../mock";
 import { getMockCoachAnswer } from "../mock/fixtures/coach";
 import { buildCoachSystemPrompt, buildCoachUserMessage } from "../prompts/coach-explainer";
 import { OrchestratorError } from "./interview-orchestrator";
+import { parseQuestionMeta } from "../utils/question-meta";
 
-interface QuestionMeta {
-  targetSkill?: string;
-}
-
-function toView(note: {
+/** Map a stored CoachNote row to the view shared by the coach panel and the report. */
+export function toCoachNoteView(note: {
   id: string;
   questionId: string | null;
-  source: string;
+  source: CoachSource;
   selection: string | null;
   prompt: string;
   answer: string;
@@ -24,7 +22,7 @@ function toView(note: {
   return {
     id: note.id,
     questionId: note.questionId,
-    source: note.source as CoachNoteView["source"],
+    source: note.source,
     selection: note.selection,
     prompt: note.prompt,
     answer: note.answer,
@@ -39,7 +37,7 @@ export async function listCoachNotes(sessionId: string): Promise<CoachNoteView[]
     where: { sessionId },
     orderBy: { createdAt: "asc" },
   });
-  return notes.map(toView);
+  return notes.map(toCoachNoteView);
 }
 
 /**
@@ -87,15 +85,7 @@ export async function* streamCoachAnswer(
         select: { id: true, text: true, category: true, metadata: true, transcript: true },
       });
 
-  let targetSkill = "general";
-  if (question?.metadata) {
-    try {
-      const meta = JSON.parse(question.metadata) as QuestionMeta;
-      if (meta.targetSkill) targetSkill = meta.targetSkill;
-    } catch {
-      // ignore malformed metadata
-    }
-  }
+  const targetSkill = parseQuestionMeta(question?.metadata ?? null).targetSkill || "general";
 
   const priorNotes = await prisma.coachNote.findMany({
     where: { sessionId },
@@ -146,5 +136,5 @@ export async function* streamCoachAnswer(
     },
   });
 
-  return toView(note);
+  return toCoachNoteView(note);
 }

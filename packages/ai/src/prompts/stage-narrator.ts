@@ -1,4 +1,4 @@
-import type { InterviewStage, Language } from "@interviewiq/types";
+import type { Language } from "@interviewiq/types";
 import { callClaudePlainText } from "../client";
 import { languageInstruction } from "./language";
 
@@ -38,7 +38,6 @@ Return ONLY the transition text. No JSON, no quotes, no formatting. This will be
 export async function generateStageTransition(params: {
   companyName: string;
   jobTitle: string;
-  completedStage: InterviewStage;
   completedStageLabel: string;
   completedStageScore: number;
   nextStageLabel: string;

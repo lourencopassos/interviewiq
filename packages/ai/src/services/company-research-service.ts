@@ -1,6 +1,6 @@
 import { prisma } from "@interviewiq/db";
 import { companyIntelligenceSchema, type CompanyIntelligence } from "@interviewiq/types";
-import { researchCompany } from "../prompts/company-research";
+import { EMPTY_INTELLIGENCE, researchCompany } from "../prompts/company-research";
 import { parseJsonObject } from "../utils/json";
 import { isMockMode } from "../mock";
 
@@ -14,17 +14,7 @@ function isCacheableName(name: string): boolean {
   return name.length <= MAX_CACHEABLE_NAME_LENGTH && CACHEABLE_NAME.test(name);
 }
 
-export const EMPTY_INTELLIGENCE: CompanyIntelligence = {
-  companySize: null,
-  fundingStage: null,
-  techStack: [],
-  engineeringCulture: null,
-  recentNews: [],
-  interviewProcess: null,
-  knownChallenges: [],
-  values: [],
-  coachingTip: null,
-};
+export { EMPTY_INTELLIGENCE };
 
 /** Only cache research that actually found something — never pin an empty result for a week. */
 export function hasIntelligence(intel: CompanyIntelligence): boolean {

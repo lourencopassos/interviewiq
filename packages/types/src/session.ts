@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { JOB_DESCRIPTION_MIN_LENGTH } from "./job";
 
 export const Difficulty = {
   JUNIOR: "JUNIOR",
@@ -7,6 +8,14 @@ export const Difficulty = {
   STAFF: "STAFF",
 } as const;
 export type Difficulty = (typeof Difficulty)[keyof typeof Difficulty];
+
+/** Questions generated for a single-type interview, by difficulty. */
+export const QUESTION_COUNT: Record<Difficulty, number> = {
+  JUNIOR: 5,
+  MID: 6,
+  SENIOR: 7,
+  STAFF: 8,
+};
 
 export const InterviewType = {
   PHONE_SCREEN: "PHONE_SCREEN",
@@ -26,7 +35,6 @@ export type Language = (typeof Language)[keyof typeof Language];
 
 export const SessionStatus = {
   SETUP: "SETUP",
-  RESEARCHING: "RESEARCHING",
   BRIEFING: "BRIEFING",
   INTERVIEWING: "INTERVIEWING",
   WRAPPING_UP: "WRAPPING_UP",
@@ -71,7 +79,7 @@ export const createSessionRequestSchema = z.object({
   clientId: z.string().min(1).max(128),
   jobTitle: z.string().min(1).max(200),
   companyName: z.string().min(1).max(200),
-  jobDescription: z.string().min(50).max(15000),
+  jobDescription: z.string().min(JOB_DESCRIPTION_MIN_LENGTH).max(15000),
   difficulty: z.enum(["JUNIOR", "MID", "SENIOR", "STAFF"]),
   interviewType: z.enum([
     "PHONE_SCREEN",

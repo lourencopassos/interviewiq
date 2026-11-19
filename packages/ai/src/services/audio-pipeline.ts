@@ -1,3 +1,4 @@
+import { normalizeAudioMimeType } from "@interviewiq/types";
 import { isMockMode, delay } from "../mock";
 import { getMockSilenceBuffer } from "../mock/mock-audio";
 import { getNextMockTranscript } from "../mock/fixtures/transcript";
@@ -28,28 +29,6 @@ export class AudioPipelineError extends Error {
   }
 }
 
-/** Map a MediaRecorder mime type to something Whisper accepts, with a matching filename extension. */
-function normalizeAudioType(mimeType: string): { type: string; extension: string } {
-  const base = mimeType.split(";")[0].trim().toLowerCase();
-  switch (base) {
-    case "audio/mp4":
-    case "audio/x-m4a":
-    case "audio/m4a":
-      return { type: "audio/mp4", extension: "m4a" };
-    case "audio/ogg":
-      return { type: "audio/ogg", extension: "ogg" };
-    case "audio/wav":
-    case "audio/x-wav":
-      return { type: "audio/wav", extension: "wav" };
-    case "audio/mpeg":
-    case "audio/mp3":
-      return { type: "audio/mpeg", extension: "mp3" };
-    case "audio/webm":
-    default:
-      return { type: "audio/webm", extension: "webm" };
-  }
-}
-
 export class AudioPipeline {
   async transcribe(
     audioBuffer: Buffer,
@@ -58,13 +37,12 @@ export class AudioPipeline {
   ): Promise<string> {
     if (isMockMode()) {
       await delay(200);
-      console.log("[MOCK] transcribe — returning canned transcript");
       return getNextMockTranscript();
     }
 
     const apiKey = requireApiKey("openai");
     const whisper = WHISPER_BY_LANGUAGE[language] ?? WHISPER_BY_LANGUAGE.EN;
-    const { type, extension } = normalizeAudioType(mimeType);
+    const { type, extension } = normalizeAudioMimeType(mimeType);
 
     try {
       const formData = new FormData();
@@ -107,7 +85,6 @@ export class AudioPipeline {
   async synthesize(text: string, language: string): Promise<Buffer> {
     if (isMockMode()) {
       await delay(150);
-      console.log("[MOCK] synthesize — returning silence buffer");
       return getMockSilenceBuffer();
     }
 

@@ -5,19 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Printer, RotateCcw, History } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 
-interface ReportActionsProps {
-  sessionId: string;
-}
-
-export function ReportActions({ sessionId }: ReportActionsProps) {
+export function ReportActions() {
   const { t } = useI18n();
   const copy = t.report.actions;
 
   return (
-    <div
-      data-session-id={sessionId}
-      className="flex flex-wrap items-center gap-3 border-t border-line pt-6 print:hidden"
-    >
+    <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6 print:hidden">
       <Button asChild variant="accent">
         <Link href="/new">
           <RotateCcw className="h-4 w-4" />

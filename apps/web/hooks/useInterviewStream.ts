@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useReducer, useCallback, useState } from "react";
-import type { AvatarFailureCode, SessionStatus } from "@interviewiq/types";
+import {
+  normalizeAudioMimeType,
+  type AvatarFailureCode,
+  type SessionStatus,
+} from "@interviewiq/types";
 import { clientHeaders, getClientId } from "@/lib/client-id";
 
 interface InterviewState {
@@ -31,7 +35,6 @@ interface InterviewState {
     iceServers: RTCIceServer[];
     presenterUrl?: string;
   } | null;
-  avatarSpeaking: boolean;
   avatarFailed: boolean;
   /** Stable code from the last `avatar_stream_failed` event, mapped to copy by the page. */
   avatarFailureCode: AvatarFailureCode | null;
@@ -86,7 +89,6 @@ type InterviewAction =
         presenterUrl?: string;
       };
     }
-  | { type: "avatar_stream_audio"; payload: { questionId: string } }
   | { type: "avatar_stream_failed"; payload: { code?: AvatarFailureCode; reason: string } }
   | {
       type: "error";
@@ -107,7 +109,6 @@ const initialState: InterviewState = {
   stageTransition: null,
   currentStage: null,
   avatarStreamData: null,
-  avatarSpeaking: false,
   avatarFailed: false,
   avatarFailureCode: null,
   isComplete: false,
@@ -133,7 +134,6 @@ function interviewReducer(
         evaluation: null,
         transitionMessage: null,
         audioUrl: null,
-        avatarSpeaking: false,
       };
 
     case "audio_ready":
@@ -183,9 +183,6 @@ function interviewReducer(
         },
       };
 
-    case "avatar_stream_audio":
-      return { ...state, avatarSpeaking: true };
-
     case "avatar_stream_failed":
       return { ...state, avatarFailed: true, avatarFailureCode: action.payload.code ?? "AVATAR_UNAVAILABLE" };
 
@@ -213,15 +210,6 @@ function interviewReducer(
 }
 
 const MAX_RECONNECT_ATTEMPTS = 5;
-
-function extensionForMimeType(mimeType: string): string {
-  const base = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
-  if (base === "audio/mp4" || base === "video/mp4") return "mp4";
-  if (base === "audio/ogg") return "ogg";
-  if (base === "audio/wav" || base === "audio/x-wav") return "wav";
-  if (base === "audio/mpeg") return "mp3";
-  return "webm";
-}
 
 export function useInterviewStream(sessionId: string) {
   const [state, dispatch] = useReducer(interviewReducer, initialState);
@@ -297,7 +285,7 @@ export function useInterviewStream(sessionId: string) {
   const submitAnswer = useCallback(
     async (audioBlob: Blob) => {
       const formData = new FormData();
-      const extension = extensionForMimeType(audioBlob.type);
+      const { extension } = normalizeAudioMimeType(audioBlob.type);
       formData.append("audio", audioBlob, `answer.${extension}`);
 
       let response: Response;

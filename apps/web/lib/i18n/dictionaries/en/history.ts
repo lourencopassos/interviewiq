@@ -17,8 +17,6 @@ export const history = {
   },
   card: {
     outOf: "/100",
-    /** Statuses not covered by common.status, shown lowercase in the pill. */
-    researching: "researching",
     resume: "Resume",
     report: "Report",
     retake: "Retake",

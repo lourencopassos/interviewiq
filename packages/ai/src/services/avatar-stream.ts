@@ -197,7 +197,6 @@ export class AvatarStream {
   async sendText(text: string): Promise<void> {
     if (this.isMockStream) {
       await delay(50);
-      console.log("[MOCK] avatar stream — simulated text injection");
       return;
     }
 

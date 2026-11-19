@@ -23,12 +23,11 @@ export async function POST(request: Request) {
     if (!rl.allowed) return rateLimitResponse(rl);
 
     // Never throws: research is optional, an empty result lets the interview proceed.
-    const { intel, cached } = await researchCompanyCached(
+    const { intel } = await researchCompanyCached(
       parsed.data.companyName,
       parsed.data.jobTitle,
       parsed.data.primarySkills,
     );
-    if (cached) console.log(`[Research] Cache hit for "${parsed.data.companyName}"`);
 
     return NextResponse.json(intel);
   });

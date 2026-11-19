@@ -9,8 +9,6 @@ interface AudioRecorderState {
   duration: number;
   audioLevel: number;
   permissionState: PermissionState;
-  /** The MediaRecorder mime type in use (null until the first recording starts). */
-  mimeType: string | null;
 }
 
 /** Preferred container/codec combinations, most desirable first. */
@@ -44,7 +42,6 @@ export function useAudioRecorder() {
     duration: 0,
     audioLevel: 0,
     permissionState: "unknown",
-    mimeType: null,
   });
 
   // Check microphone permission on mount
@@ -204,8 +201,6 @@ export function useAudioRecorder() {
         duration: 0,
         audioLevel: 0,
         permissionState: "granted",
-        // Prefer what the browser actually negotiated
-        mimeType: mediaRecorder.mimeType || mimeType || null,
       }));
       updateAudioLevel();
     } catch (error) {

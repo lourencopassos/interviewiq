@@ -239,14 +239,6 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.avatarStreamData]);
 
-  // Handle avatar stream audio injection event
-  useEffect(() => {
-    if (interview.avatarSpeaking) {
-      avatarStream.onAudioInjected();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interview.avatarSpeaking]);
-
   // Handle avatar stream failure
   useEffect(() => {
     if (interview.avatarFailed) {
@@ -262,14 +254,6 @@ export default function InterviewPage() {
   const questionId = interview.currentQuestion?.questionId;
   const pendingNarration = useRef<string | null>(null);
   const questionNarration = useRef<string | null>(null);
-
-  // Sync avatar speaking state with audio playback ending
-  useEffect(() => {
-    if (!playback.isPlaying && avatarStream.isSpeaking) {
-      avatarStream.onAudioEnded();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback.isPlaying]);
 
   // Handle transition text
   useEffect(() => {
