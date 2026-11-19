@@ -41,6 +41,8 @@ export interface StreamSession {
   id: string;
   offer: SDPDescriptionInit;
   iceServers: ICEServer[];
+  /** The still image the stream was created from. */
+  presenterUrl: string;
 }
 
 export class AvatarStream {
@@ -78,6 +80,7 @@ export class AvatarStream {
         id: "mock-stream",
         offer: { type: "offer", sdp: "mock-sdp" },
         iceServers: [],
+        presenterUrl: presenterImageUrl || this.presenterUrl,
       };
     }
 
@@ -109,6 +112,7 @@ export class AvatarStream {
       id: data.id,
       offer: data.offer,
       iceServers: data.ice_servers,
+      presenterUrl: presenterImageUrl || this.presenterUrl,
     };
   }
 
@@ -230,7 +234,9 @@ export class AvatarStream {
     if (!response.ok) {
       const errorText = await response.text();
       throw new AvatarStreamError(
-        `D-ID stream text injection failed (${response.status}): ${errorText}`,
+        response.status === 402
+          ? "D-ID account has no credits left; the avatar can't speak (video falls back to the still image)."
+          : `D-ID stream text injection failed (${response.status}): ${errorText}`,
       );
     }
   }

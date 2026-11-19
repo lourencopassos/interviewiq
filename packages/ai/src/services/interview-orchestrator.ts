@@ -125,7 +125,7 @@ export class InterviewOrchestrator {
   private avatarStream: AvatarStream | null = null;
 
   // In-process locks. Cross-process safety comes from atomic DB status transitions.
-  private startPromise: Promise<void> | null = null;
+  private startPromise: Promise<"started" | "pending" | "resumed"> | null = null;
   private answerPromise: Promise<void> | null = null;
   private reportPromise: Promise<CoachingReport> | null = null;
 
@@ -213,27 +213,38 @@ export class InterviewOrchestrator {
     return { parsedJob, companyIntel };
   }
 
-  /** Emit audio_ready and, in video mode, push the text to the D-ID stream for lip-sync. */
+  /** What the avatar should lip-sync the next time the client starts playback. */
+  private lastSpoken: { questionId: string; text: string } | null = null;
+
+  /**
+   * Emit audio_ready and remember the spoken text. The D-ID talk itself is
+   * triggered by the client (POST /avatar-speak) when the audio actually starts,
+   * so lips and voice line up and nothing is spoken into a half-open connection.
+   */
   private async emitAudioAndStream(
     questionId: string,
     audioUrl: string,
     spokenText: string | null,
   ): Promise<void> {
     this.emit({ type: "audio_ready", data: { questionId, audioUrl } });
+    if (spokenText) this.lastSpoken = { questionId, text: spokenText };
+  }
 
-    if (this.avatarStream?.isActive && spokenText) {
-      try {
-        await this.avatarStream.sendText(spokenText);
-        this.emit({ type: "avatar_stream_audio", data: { questionId } });
-      } catch (error) {
-        console.warn(`Avatar stream text failed for ${questionId}:`, error);
-        this.emit({
-          type: "avatar_stream_failed",
-          data: {
-            reason: error instanceof Error ? error.message : "Stream text failed",
-          },
-        });
-      }
+  /** Make the avatar say the current line. Returns false when there is no video stream. */
+  async speakCurrent(): Promise<boolean> {
+    if (!this.avatarStream?.isActive || !this.lastSpoken) return false;
+    const { questionId, text } = this.lastSpoken;
+    try {
+      await this.avatarStream.sendText(text);
+      this.emit({ type: "avatar_stream_audio", data: { questionId } });
+      return true;
+    } catch (error) {
+      console.warn(`Avatar stream text failed for ${questionId}:`, error);
+      this.emit({
+        type: "avatar_stream_failed",
+        data: { reason: error instanceof Error ? error.message : "Stream text failed" },
+      });
+      return false;
     }
   }
 
@@ -260,7 +271,7 @@ export class InterviewOrchestrator {
     // this question instead of re-processing the previous one.
     if (options.persistIndex !== false) {
       await prisma.session.update({
-        where: { id: this.sessionId },
+        where: { id: this.sessionId, status: "INTERVIEWING" },
         data: { currentIndex: index },
       });
     }
@@ -302,9 +313,18 @@ export class InterviewOrchestrator {
     ttsCache.prefetch(this.sessionId, questions[index + 1], session.language);
   }
 
+  /**
+   * Create a D-ID stream and send its WebRTC offer to the client. An offer is
+   * single-use, so any previous stream is torn down first; call this whenever a
+   * client (re)connects and needs a fresh peer connection.
+   */
   private async setupAvatar(session: SessionRecord): Promise<void> {
     if (!session.videoMode) return;
     try {
+      if (this.avatarStream) {
+        await this.avatarStream.destroy().catch(() => undefined);
+        this.avatarStream = null;
+      }
       this.avatarStream = new AvatarStream(session.language);
       const streamSession = await this.avatarStream.createStream(
         session.avatarImageUrl ?? undefined,
@@ -316,6 +336,7 @@ export class InterviewOrchestrator {
           streamId: streamSession.id,
           sdpOffer: streamSession.offer,
           iceServers: streamSession.iceServers,
+          presenterUrl: streamSession.presenterUrl,
         },
       });
     } catch (error) {
@@ -349,11 +370,16 @@ export class InterviewOrchestrator {
 
     // Take the in-process lock synchronously, before any await, so two calls
     // in the same tick cannot both pass the check above.
-    const run = this.claimAndStart();
-    this.startPromise = run.then(() => undefined, () => undefined).finally(() => {
+    this.startPromise = this.claimAndStart();
+    try {
+      return await this.startPromise;
+    } catch (error) {
+      // A retry should pick up the current implementation after a dev reload.
+      if (orchestrators.get(this.sessionId) === this) orchestrators.delete(this.sessionId);
+      throw error;
+    } finally {
       this.startPromise = null;
-    });
-    return run;
+    }
   }
 
   private async claimAndStart(): Promise<"started" | "pending" | "resumed"> {
@@ -390,7 +416,11 @@ export class InterviewOrchestrator {
       // Clear any leftovers from a previously failed attempt.
       await prisma.question.deleteMany({ where: { sessionId: this.sessionId } });
 
-      await this.setupAvatar(session);
+      // The SSE connect replay usually creates the avatar stream first (so the
+      // offer lands on a live connection); only create one here if it hasn't.
+      if (session.videoMode && !this.avatarStream?.isActive) {
+        await this.setupAvatar(session);
+      }
 
       const { parsedJob, companyIntel } = this.parseJobContext(session);
       const isFullLoop = session.interviewType === "FULL_LOOP";
@@ -409,7 +439,7 @@ export class InterviewOrchestrator {
       }
 
       await prisma.session.update({
-        where: { id: this.sessionId },
+        where: { id: this.sessionId, status: "BRIEFING" },
         data: { status: "INTERVIEWING", currentIndex: 0, opening, closing },
       });
       committed = true;
@@ -437,7 +467,7 @@ export class InterviewOrchestrator {
       }
       // Roll back so the user can retry instead of being stuck in BRIEFING.
       await prisma.session
-        .update({ where: { id: this.sessionId }, data: { status: "SETUP" } })
+        .updateMany({ where: { id: this.sessionId, status: "BRIEFING" }, data: { status: "SETUP" } })
         .catch(() => undefined);
       await this.avatarStream?.destroy().catch(() => undefined);
       this.avatarStream = null;
@@ -490,7 +520,7 @@ export class InterviewOrchestrator {
     companyIntel: CompanyIntelligence | null,
   ): Promise<{ opening: string; closing: string }> {
     const stageResults = await Promise.all(
-      FULL_LOOP_STAGES.map((stageConfig) =>
+      FULL_LOOP_STAGES.map((stageConfig, index) =>
         generateQuestionSet({
           companyName: session.companyName,
           jobTitle: session.jobTitle,
@@ -500,7 +530,8 @@ export class InterviewOrchestrator {
           parsedJob,
           companyIntel,
           resumeText: session.resumeText,
-      language: session.language as Language,
+          language: session.language as Language,
+          continuingStage: index > 0,
           questionCount: stageConfig.questionCount[1],
         }),
       ),
@@ -554,9 +585,8 @@ export class InterviewOrchestrator {
       case "INTERVIEWING": {
         const questions = await this.loadQuestions();
         this.emit({ type: "state_change", data: { status: "INTERVIEWING" } });
-        if (session.videoMode && !this.avatarStream?.isActive) {
-          await this.setupAvatar(session);
-        }
+        // A reconnecting browser has no peer connection any more; give it a new offer.
+        await this.setupAvatar(session);
         if (session.interviewType === "FULL_LOOP") {
           this.emit({
             type: "stage_transition",
@@ -581,7 +611,7 @@ export class InterviewOrchestrator {
         });
         if (existing) {
           await prisma.session.update({
-            where: { id: this.sessionId },
+            where: { id: this.sessionId, status: { not: "ABANDONED" } },
             data: { status: "COMPLETED" },
           });
           this.emitCompleted();
@@ -603,6 +633,11 @@ export class InterviewOrchestrator {
         return;
       default:
         this.emit({ type: "state_change", data: { status: session.status } });
+        // Before the interview starts, hand the connected client its avatar offer
+        // so it is negotiated by the time the first question is spoken.
+        if (session.videoMode && (session.status === "SETUP" || session.status === "BRIEFING")) {
+          await this.setupAvatar(session);
+        }
     }
   }
 
@@ -828,7 +863,7 @@ export class InterviewOrchestrator {
     const closingText = `${feedback} ${closing}`;
 
     await prisma.session.update({
-      where: { id: this.sessionId },
+      where: { id: this.sessionId, status: "INTERVIEWING" },
       data: { status: "WRAPPING_UP" },
     });
     this.emit({ type: "state_change", data: { status: "WRAPPING_UP" } });
@@ -936,7 +971,7 @@ export class InterviewOrchestrator {
           create: { sessionId: this.sessionId, ...data },
         }),
         prisma.session.update({
-          where: { id: this.sessionId },
+          where: { id: this.sessionId, status: { not: "ABANDONED" } },
           data: { status: "COMPLETED" },
         }),
       ]);
