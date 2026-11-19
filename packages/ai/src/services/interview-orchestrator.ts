@@ -230,6 +230,22 @@ export class InterviewOrchestrator {
     if (spokenText) this.lastSpoken = { questionId, text: spokenText };
   }
 
+  /**
+   * Mint a new D-ID stream and emit its offer. Called by the browser when it
+   * needs a peer connection (first load, reload, or after a failure), so the
+   * account's concurrent-stream quota is only spent on connections that will
+   * actually be negotiated. Returns false for non-video sessions.
+   */
+  async requestAvatarOffer(): Promise<boolean> {
+    const session = await this.loadSession();
+    if (!session.videoMode) return false;
+    if (session.status !== "INTERVIEWING" && session.status !== "BRIEFING" && session.status !== "SETUP") {
+      return false;
+    }
+    await this.setupAvatar(session);
+    return this.avatarStream?.isActive ?? false;
+  }
+
   /** Make the avatar say the current line. Returns false when there is no video stream. */
   async speakCurrent(): Promise<boolean> {
     if (!this.avatarStream?.isActive || !this.lastSpoken) return false;
@@ -416,11 +432,6 @@ export class InterviewOrchestrator {
       // Clear any leftovers from a previously failed attempt.
       await prisma.question.deleteMany({ where: { sessionId: this.sessionId } });
 
-      // The SSE connect replay usually creates the avatar stream first (so the
-      // offer lands on a live connection); only create one here if it hasn't.
-      if (session.videoMode && !this.avatarStream?.isActive) {
-        await this.setupAvatar(session);
-      }
 
       const { parsedJob, companyIntel } = this.parseJobContext(session);
       const isFullLoop = session.interviewType === "FULL_LOOP";
@@ -585,8 +596,6 @@ export class InterviewOrchestrator {
       case "INTERVIEWING": {
         const questions = await this.loadQuestions();
         this.emit({ type: "state_change", data: { status: "INTERVIEWING" } });
-        // A reconnecting browser has no peer connection any more; give it a new offer.
-        await this.setupAvatar(session);
         if (session.interviewType === "FULL_LOOP") {
           this.emit({
             type: "stage_transition",
@@ -633,11 +642,6 @@ export class InterviewOrchestrator {
         return;
       default:
         this.emit({ type: "state_change", data: { status: session.status } });
-        // Before the interview starts, hand the connected client its avatar offer
-        // so it is negotiated by the time the first question is spoken.
-        if (session.videoMode && (session.status === "SETUP" || session.status === "BRIEFING")) {
-          await this.setupAvatar(session);
-        }
     }
   }
 
@@ -667,11 +671,6 @@ export class InterviewOrchestrator {
         `Cannot accept an answer while the session is ${session.status}`,
         409,
       );
-    }
-
-    if (session.videoMode && !this.avatarStream?.isActive) {
-      // Orchestrator was recreated (restart / other process) — re-establish video.
-      await this.setupAvatar(session);
     }
 
     const questions = await this.loadQuestions();
