@@ -115,8 +115,8 @@ export const interview: typeof En = {
   },
   errors: {
     network: "Erro de rede — verifique sua conexão",
-    stackTrace: "Rastreamento da pilha",
     startFailed: "Não foi possível iniciar a entrevista",
+    notFound: "Esta entrevista não existe ou foi iniciada em outro navegador.",
     startFailedStatus: "Não foi possível iniciar a entrevista ({status})",
     submitFailed: "Não foi possível enviar sua resposta",
     uploadNetwork: "Erro de rede — não foi possível enviar sua resposta",
@@ -130,6 +130,11 @@ export const interview: typeof En = {
     NO_QUESTION: "Nenhuma pergunta atual encontrada.",
     REPORT_FAILED:
       "Não foi possível gerar o seu relatório. Suas respostas estão salvas — você pode tentar de novo na página do relatório.",
+    START_FAILED: "Não foi possível iniciar a entrevista. Tente de novo.",
+    COACH_FAILED: "O coach não está disponível agora.",
+    AVATAR_UNAVAILABLE: "O entrevistador em vídeo não está disponível. Seguimos só com áudio.",
+    AVATAR_QUOTA: "O serviço de vídeo atingiu o limite de transmissões simultâneas. Seguimos só com áudio.",
+    AVATAR_NO_CREDITS: "A conta do serviço de vídeo está sem créditos. Seguimos só com áudio.",
   },
   stop: {
     button: "Encerrar entrevista",

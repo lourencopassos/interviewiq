@@ -17,8 +17,6 @@ export const history = {
   },
   card: {
     outOf: "/100",
-    /** Statuses not covered by common.status, shown lowercase in the pill. */
-    researching: "researching",
     resume: "Resume",
     report: "Report",
     retake: "Retake",
@@ -31,6 +29,16 @@ export const history = {
     gone: "Session no longer exists",
     status: "Failed to delete session ({status})",
     generic: "Failed to delete session",
+  },
+  deleteAll: {
+    eyebrow: "privacy",
+    body: "Sessions, CVs and transcripts are stored in this server's database. Saved jobs and your CV also live in this browser.",
+    button: "Delete all my data",
+    confirm: "Delete everything",
+    deleting: "Deleting…",
+    done: "Deleted {n} sessions from the server and cleared the CV and jobs saved in this browser.",
+    failed: "Could not delete your data ({status})",
+    network: "Network error — nothing was deleted",
   },
   empty: {
     eyebrow: "[ empty ]",

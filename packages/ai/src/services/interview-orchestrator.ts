@@ -3,7 +3,6 @@ import {
   FULL_LOOP_STAGES,
   parsedJobSchema,
   companyIntelligenceSchema,
-  type GeneratedQuestion,
   type ParsedJob,
   type CompanyIntelligence,
   type CoachingReport,
@@ -12,17 +11,21 @@ import {
   type Language,
   type InterviewEvent,
   type InterviewStage,
+  type AvatarFailureCode,
 } from "@interviewiq/types";
 import { AudioPipeline } from "./audio-pipeline";
 import { AdaptiveEngine, type AdaptiveQuestion } from "./adaptive-engine";
 import { ttsCache } from "../cache/tts-cache";
-import { AvatarStream } from "./avatar-stream";
+import { AvatarStream, AvatarStreamError } from "./avatar-stream";
+import { isMockMode } from "../mock";
+import { MissingApiKeyError } from "../errors";
 import { sseEmitter } from "../sse/emitter";
 import { generateQuestionSet } from "../prompts/question-generator";
 import { evaluateAnswer } from "../prompts/answer-evaluator";
 import { generateCoachingReport } from "../prompts/report-generator";
 import { generateStageTransition } from "../prompts/stage-narrator";
 import { isString, parseJsonArray } from "../utils/json";
+import { parseQuestionMeta, type QuestionMeta } from "../utils/question-meta";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -45,14 +48,21 @@ export class OrchestratorError extends Error {
   }
 }
 
-/** Shape we persist in Question.metadata (a GeneratedQuestion plus runtime flags). */
-interface QuestionMeta extends Partial<GeneratedQuestion> {
-  isFollowUp?: boolean;
-  parentQuestionId?: string;
+/** Fixed client copy for `avatar_stream_failed`; provider detail stays in the server log. */
+const AVATAR_FAILURE_REASON: Record<AvatarFailureCode, string> = {
+  AVATAR_UNAVAILABLE: "The video interviewer is unavailable. Continuing with audio.",
+  AVATAR_QUOTA: "The video service is at its concurrent stream limit. Continuing with audio.",
+  AVATAR_NO_CREDITS: "The video service account has no credits left. Continuing with audio.",
+};
+
+function avatarFailure(error: unknown): { code: AvatarFailureCode; reason: string } {
+  const code = error instanceof AvatarStreamError ? error.code : "AVATAR_UNAVAILABLE";
+  return { code, reason: AVATAR_FAILURE_REASON[code] };
 }
 
 /** A question as loaded from the DB — the single source of truth during an interview. */
 interface RuntimeQuestion extends AdaptiveQuestion {
+  stage: InterviewStage | null;
   order: number;
   text: string;
   category: string;
@@ -74,29 +84,19 @@ const DEFAULT_SCORING_GUIDE = {
   excellent: "Outstanding answer",
 };
 
-function parseMeta(raw: string | null): QuestionMeta {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed !== null ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
 function toRuntime(q: {
   id: string;
   order: number;
   text: string;
   category: string;
-  stage: string | null;
+  stage: InterviewStage | null;
   metadata: string | null;
   score: number | null;
   transcript: string | null;
   strengths: string | null;
   gaps: string | null;
 }): RuntimeQuestion {
-  const meta = parseMeta(q.metadata);
+  const meta = parseQuestionMeta(q.metadata);
   return {
     id: q.id,
     order: q.order,
@@ -221,7 +221,7 @@ export class InterviewOrchestrator {
    * triggered by the client (POST /avatar-speak) when the audio actually starts,
    * so lips and voice line up and nothing is spoken into a half-open connection.
    */
-  private async emitAudioAndStream(
+  private async emitAudioReady(
     questionId: string,
     audioUrl: string,
     spokenText: string | null,
@@ -250,16 +250,19 @@ export class InterviewOrchestrator {
   async speakCurrent(): Promise<boolean> {
     if (!this.avatarStream?.isActive || !this.lastSpoken) return false;
     const { questionId, text } = this.lastSpoken;
+    // A stream minted while mock mode was on must not serve a real request (and
+    // vice versa): mint a matching one. The text queues until its handshake.
+    if (this.avatarStream.mock !== isMockMode()) {
+      await this.setupAvatar(await this.loadSession());
+      if (!this.avatarStream?.isActive) return false;
+    }
     try {
       await this.avatarStream.sendText(text);
       this.emit({ type: "avatar_stream_audio", data: { questionId } });
       return true;
     } catch (error) {
       console.warn(`Avatar stream text failed for ${questionId}:`, error);
-      this.emit({
-        type: "avatar_stream_failed",
-        data: { reason: error instanceof Error ? error.message : "Stream text failed" },
-      });
+      this.emit({ type: "avatar_stream_failed", data: avatarFailure(error) });
       return false;
     }
   }
@@ -312,7 +315,7 @@ export class InterviewOrchestrator {
         session.language,
         options.prefixText ? undefined : question.id,
       );
-      await this.emitAudioAndStream(question.id, audioUrl, spokenText);
+      await this.emitAudioReady(question.id, audioUrl, spokenText);
     } catch (error) {
       // Audio is a nicety; the interview continues with the written question.
       console.warn(`TTS failed for question ${question.id}:`, error);
@@ -342,9 +345,7 @@ export class InterviewOrchestrator {
         this.avatarStream = null;
       }
       this.avatarStream = new AvatarStream(session.language);
-      const streamSession = await this.avatarStream.createStream(
-        session.avatarImageUrl ?? undefined,
-      );
+      const streamSession = await this.avatarStream.createStream();
       this.emit({
         type: "avatar_stream_ready",
         data: {
@@ -358,12 +359,7 @@ export class InterviewOrchestrator {
     } catch (error) {
       console.warn("Avatar stream creation failed, falling back to audio-only:", error);
       this.avatarStream = null;
-      this.emit({
-        type: "avatar_stream_failed",
-        data: {
-          reason: error instanceof Error ? error.message : "Stream creation failed",
-        },
-      });
+      this.emit({ type: "avatar_stream_failed", data: avatarFailure(error) });
     }
   }
 
@@ -411,7 +407,7 @@ export class InterviewOrchestrator {
         return "resumed";
       }
       // BRIEFING with no generation running in this process means a previous
-      // attempt crashed mid-way (or another process is generating — see FIXES.md D1).
+      // attempt crashed mid-way (or another process is generating — see ARCHITECTURE.md).
       // Reclaim it so the user isn't stuck.
       claimed = await prisma.session.updateMany({
         where: { id: this.sessionId, status: "BRIEFING" },
@@ -483,14 +479,16 @@ export class InterviewOrchestrator {
       await this.avatarStream?.destroy().catch(() => undefined);
       this.avatarStream = null;
 
+      // The start route logs the full error. OrchestratorError messages are our own fixed copy; anything else
+      // (provider bodies, stack details) stays in the server log.
       this.emit({
         type: "error",
-        data: {
-          code: error instanceof OrchestratorError ? error.code : "START_FAILED",
-          message:
-            error instanceof Error ? error.message : "Failed to start the interview",
-          retryable: true,
-        },
+        data:
+          error instanceof OrchestratorError
+            ? { code: error.code, message: error.message, retryable: true }
+            : error instanceof MissingApiKeyError
+              ? { code: error.code, message: error.message, retryable: false }
+              : { code: "START_FAILED", message: "Failed to start the interview. Please try again.", retryable: true },
       });
       throw error;
     }
@@ -822,7 +820,6 @@ export class InterviewOrchestrator {
     const transitionText = await generateStageTransition({
       companyName: session.companyName,
       jobTitle: session.jobTitle,
-      completedStage: (current.stage ?? "TECHNICAL") as InterviewStage,
       completedStageLabel: completedLabel,
       completedStageScore: stageScore,
       nextStageLabel: nextLabel,
@@ -874,7 +871,7 @@ export class InterviewOrchestrator {
         closingText,
         session.language,
       );
-      await this.emitAudioAndStream(lastQuestion.id, audioUrl, closingText);
+      await this.emitAudioReady(lastQuestion.id, audioUrl, closingText);
     } catch (error) {
       console.warn("Closing TTS failed, continuing to report:", error);
     }
@@ -1030,17 +1027,6 @@ export class InterviewOrchestrator {
     ttsCache.clearSession(this.sessionId);
   }
 
-  async getState(): Promise<{ status: string; currentIndex: number; totalQuestions: number }> {
-    const session = await prisma.session.findUniqueOrThrow({
-      where: { id: this.sessionId },
-      include: { _count: { select: { questions: true } } },
-    });
-    return {
-      status: session.status,
-      currentIndex: session.currentIndex,
-      totalQuestions: session._count.questions,
-    };
-  }
 }
 
 export function getOrCreateOrchestrator(sessionId: string): InterviewOrchestrator {

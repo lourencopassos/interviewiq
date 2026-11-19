@@ -116,8 +116,8 @@ export const interview = {
   /** Client-side failure copy. */
   errors: {
     network: "Network error — please check your connection",
-    stackTrace: "Stack trace",
     startFailed: "Failed to start interview",
+    notFound: "This interview doesn't exist, or it was started in another browser.",
     startFailedStatus: "Failed to start interview ({status})",
     submitFailed: "Failed to submit your answer",
     uploadNetwork: "Network error — could not upload your answer",
@@ -132,6 +132,11 @@ export const interview = {
     NO_QUESTION: "No current question found.",
     REPORT_FAILED:
       "We couldn't generate your report. Your answers are saved — you can retry from the report page.",
+    START_FAILED: "Failed to start the interview. Please try again.",
+    COACH_FAILED: "The coach is unavailable right now.",
+    AVATAR_UNAVAILABLE: "The video interviewer is unavailable. Continuing with audio.",
+    AVATAR_QUOTA: "The video service is at its concurrent stream limit. Continuing with audio.",
+    AVATAR_NO_CREDITS: "The video service account has no credits left. Continuing with audio.",
   },
   stop: {
     button: "Stop interview",

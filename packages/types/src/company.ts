@@ -15,9 +15,9 @@ export const companyIntelligenceSchema = z.object({
 export type CompanyIntelligence = z.infer<typeof companyIntelligenceSchema>;
 
 export const researchCompanyRequestSchema = z.object({
-  companyName: z.string().min(1),
-  jobTitle: z.string().min(1),
-  primarySkills: z.array(z.string()),
+  companyName: z.string().min(1).max(200),
+  jobTitle: z.string().min(1).max(200),
+  primarySkills: z.array(z.string().max(80)).max(30),
   /** Anonymous client UUID, used for per-client rate limiting. */
   clientId: z.string().min(1).max(128).optional(),
 });

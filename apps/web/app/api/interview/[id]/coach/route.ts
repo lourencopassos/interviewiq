@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { assertOwner } from "@/lib/session-owner";
-import { listCoachNotes, streamCoachAnswer, OrchestratorError, COACH_MODEL } from "@interviewiq/ai";
+import { listCoachNotes, streamCoachAnswer, MissingApiKeyError, OrchestratorError, COACH_MODEL } from "@interviewiq/ai";
 import { coachRequestSchema, type CoachStreamEvent } from "@interviewiq/types";
-import { checkRateLimit, rateLimitResponse, readJson } from "@/lib/rate-limit";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { readJson } from "@/lib/http";
+import { errorResponse, jsonError } from "@/lib/api-response";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 export const dynamic = "force-dynamic";
 
+const COACH_FAILED_MESSAGE = "The coach is unavailable right now";
 const encoder = new TextEncoder();
 const line = (event: CoachStreamEvent) => encoder.encode(JSON.stringify(event) + "\n");
 
@@ -16,7 +19,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const owner = await assertOwner(id, request.headers.get("x-client-id"));
+  const owner = await assertOwner(id, request);
   if (!owner.ok) return owner.response;
   return NextResponse.json({ notes: await listCoachNotes(id), model: COACH_MODEL });
 }
@@ -34,17 +37,14 @@ export async function POST(
   const { id } = await params;
 
   return withMockMode(async () => {
-    const owner = await assertOwner(id, request.headers.get("x-client-id"));
+    const owner = await assertOwner(id, request);
     if (!owner.ok) return owner.response;
     const rl = checkRateLimit(`coach:${id}`, { maxRequests: 12, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
     const parsed = coachRequestSchema.safeParse(await readJson(request));
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: parsed.error.flatten() },
-        { status: 400 },
-      );
+      return jsonError(400, "INVALID_REQUEST", "Invalid request", { details: parsed.error.flatten() });
     }
 
     const cancellation = new AbortController();
@@ -58,11 +58,8 @@ export async function POST(
       first = await generator.next();
     } catch (error) {
       if (signal.aborted) return new Response(null, { status: 499 });
-      if (error instanceof OrchestratorError) {
-        return NextResponse.json({ error: error.message, code: error.code }, { status: error.httpStatus });
-      }
-      console.error("Coach request failed:", error);
-      return NextResponse.json({ error: "The coach is unavailable right now", code: "COACH_FAILED" }, { status: 502 });
+      if (!(error instanceof OrchestratorError)) console.error("Coach request failed:", error);
+      return errorResponse(error, { status: 502, code: "COACH_FAILED", error: COACH_FAILED_MESSAGE });
     }
 
     const stream = new ReadableStream({
@@ -77,12 +74,13 @@ export async function POST(
         } catch (error) {
           if (signal.aborted) return;
           console.error("Coach stream failed:", error);
+          // Fixed copy only; the provider's error text stays in the log above.
           controller.enqueue(
-            line({
-              type: "error",
-              code: error instanceof OrchestratorError ? error.code : "COACH_FAILED",
-              message: error instanceof Error ? error.message : "Coach stream failed",
-            }),
+            line(
+              error instanceof OrchestratorError || error instanceof MissingApiKeyError
+                ? { type: "error", code: error.code, message: error.message }
+                : { type: "error", code: "COACH_FAILED", message: COACH_FAILED_MESSAGE },
+            ),
           );
         } finally {
           if (!cancellation.signal.aborted) controller.close();

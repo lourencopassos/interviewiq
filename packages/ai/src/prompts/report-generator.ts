@@ -1,5 +1,6 @@
 import {
   coachingReportSchema,
+  sanitizeReportUrls,
   type CoachingReport,
   type Difficulty,
   type InterviewType,
@@ -8,6 +9,7 @@ import {
 import { callClaude } from "../client";
 import { languageInstruction } from "./language";
 import { recoverWithDefaults } from "./recover";
+import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
 
 interface QuestionWithAnswer {
   text: string;
@@ -26,10 +28,10 @@ function buildSystemPrompt(params: {
   jobTitle: string;
   difficulty: Difficulty;
   interviewType: InterviewType;
-  resumeText?: string | null;
+  hasResume: boolean;
   language?: Language;
 }): string {
-  const { companyName, jobTitle, difficulty, interviewType, resumeText } = params;
+  const { companyName, jobTitle, difficulty, interviewType, hasResume } = params;
 
   return `You are an expert technical interview coach preparing a debrief for a candidate.
 
@@ -37,6 +39,8 @@ Interview context:
 - Role: ${jobTitle} at ${companyName}
 - Difficulty: ${difficulty}
 - Interview type: ${interviewType}
+
+The question-by-question transcript is inside <transcript> tags in the user message${hasResume ? " and the candidate's resume/CV inside <resume> tags" : ""}. ${DATA_ONLY_INSTRUCTION}
 
 Generate a comprehensive coaching report as JSON:
 
@@ -75,13 +79,10 @@ Generate a comprehensive coaching report as JSON:
 Be specific, honest, and constructive. Reference actual answer content.
 studyPlan should be prioritized — most impactful gaps first.
 If the candidate asked the coach about a topic during the interview, treat it as a confirmed gap: cover it in the study plan and, when they asked before answering, say so plainly in that question's assessment.
-Resources should be real, well-known references — no hallucinated URLs. Use null for url if unsure.
+Resources should be real, well-known references — no hallucinated URLs. Every url must be an absolute https:// link; use null if unsure.
 Score calibrated to the ${difficulty} difficulty level.
-${resumeText ? `
-Candidate's resume/CV:
-${resumeText}
-
-Include in your report:
+${hasResume ? `
+Using the CV, include in your report:
 - How well their interview performance matched their CV claims
 - Specific strengths from their background that showed through
 - Gaps between stated experience and demonstrated knowledge
@@ -100,10 +101,10 @@ export async function generateCoachingReport(params: {
   resumeText?: string | null;
   language?: Language;
 }): Promise<CoachingReport> {
-  const { questionsWithAnswers, ...sessionParams } = params;
-  const systemPrompt = buildSystemPrompt(sessionParams);
+  const { questionsWithAnswers, resumeText, ...sessionParams } = params;
+  const systemPrompt = buildSystemPrompt({ ...sessionParams, hasResume: Boolean(resumeText) });
 
-  const userMessage = `Question + answer transcript pairs:\n\n${questionsWithAnswers
+  const transcript = `${questionsWithAnswers
     .map(
       (q, i) =>
         `Question ${i + 1} [${q.category}]: ${q.text}\nAnswer: ${q.transcript}\nScore: ${q.score}/100\nStrengths: ${q.keyStrengths.join(", ") || "None noted"}\nGaps: ${q.gaps.join(", ") || "None noted"}${
@@ -113,8 +114,15 @@ export async function generateCoachingReport(params: {
         }`,
     )
     .join("\n\n---\n\n")}`;
+  const userMessage = [
+    resumeText ? tagged("resume", resumeText) : null,
+    `Question + answer transcript pairs:\n${tagged("transcript", transcript)}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  const raw = await callClaude(systemPrompt, userMessage, { maxTokens: 8192 });
+  // A bad resource link becomes null instead of failing validation for the whole report.
+  const raw = sanitizeReportUrls(await callClaude(systemPrompt, userMessage, { maxTokens: 8192 }));
   const result = coachingReportSchema.safeParse(raw);
 
   if (!result.success) {

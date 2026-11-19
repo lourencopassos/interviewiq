@@ -1,6 +1,6 @@
 # Architecture
 
-InterviewIQ is a small monorepo with one unusual part: the backend is a **real-time orchestrator**, not a CRUD API. During an interview the server coordinates three external services (Claude, Whisper, ElevenLabs) in a pipeline and pushes typed events to the browser over a single Server-Sent Events connection. The browser never polls and never drives state; it reacts.
+InterviewIQ is a small monorepo with one unusual part: the backend is a **real-time orchestrator**, not a CRUD API. During an interview the server coordinates three external services (Claude, Whisper, ElevenLabs) in a pipeline and pushes typed events to the browser over a single Server-Sent Events connection. The interview page never polls and never drives state; it reacts. (The report page is the one exception: it polls while the report is being generated.)
 
 This document explains how that works and the decisions behind it. For setup see the [README](README.md).
 
@@ -11,12 +11,11 @@ apps/web            Next.js 15 (App Router). Pages, hooks, and thin API route ha
 packages/ai         The service layer. Prompts, orchestrator, audio/avatar pipelines, caches, SSE emitter, mock mode.
 packages/types      Zod schemas and TypeScript types shared by both sides, including the SSE event union.
 packages/db         Prisma schema and a globalThis-cached PrismaClient.
-packages/ui         Shared cn() helper for shadcn-style components.
 ```
 
 Rules that keep the layers honest:
 
-- **Routes are thin.** They validate the body with a schema from `packages/types`, apply a rate limit, and call one function in `packages/ai`. Business logic in a route handler is a bug.
+- **Routes are thin.** They validate the body with a schema from `packages/types`, apply a rate limit, check session ownership, and call one function in `packages/ai`. Business logic in a route handler is a bug.
 - **The database is the source of truth.** Interview progress (`status`, `currentIndex`, the ordered question list, scores) lives in Postgres. In-process state is a cache or a lock, never the only copy.
 - **The client mirrors, it does not decide.** Zustand holds UI state only. Everything about the interview arrives as SSE events.
 
@@ -56,7 +55,16 @@ Per answer
         complete   → speak closing, status WRAPPING_UP, generate report
                                            → SSE interview_complete { redirectTo }
 
-Report page
+Video mode (browser-initiated)
+  POST /api/interview/[id]/avatar-offer   create a D-ID stream → SSE avatar_stream_ready (offer + ICE)
+  POST /api/interview/[id]/avatar-sdp     relay the browser's SDP answer
+  POST /api/interview/[id]/avatar-ice     relay ICE candidates
+  POST /api/interview/[id]/avatar-speak   lip-sync the current line when its clip starts playing
+
+Coach (while paused or between answers)
+  POST /api/interview/[id]/coach    NDJSON stream from COACH_MODEL, saved as a CoachNote
+
+Report page (polls)
   GET  /api/sessions/[id]/report    200 ready | 202 not ready | 404 unknown
   POST /api/sessions/[id]/report    regenerate if generation failed
 ```
@@ -96,14 +104,16 @@ The emitter keeps one controller per session and closes the previous one on re-r
 
 ### Audio
 
-- **STT:** OpenAI Whisper via multipart upload, with the recording's real MIME type and a language hint. The browser picks the first format `MediaRecorder` supports (`webm/opus`, `webm`, `mp4`, `ogg`), which is what makes Safari work.
+- **STT:** OpenAI Whisper via a multipart `fetch` upload (no SDK), with the recording's real MIME type and a language hint. The browser picks the first format `MediaRecorder` supports (`webm/opus`, `webm`, `mp4`, `ogg`), which is what makes Safari work.
 - **TTS:** ElevenLabs `eleven_turbo_v2_5`, one voice per language. The `TTSCache` holds pre-fetched clips keyed by **database question id** (globally unique, so sessions cannot collide) and served clips keyed by a random blob id under `/api/audio/[blobId]`. Both are scoped per session and expire after 30 minutes; finishing one interview never evicts another's audio.
 - If TTS fails the question is still shown and an `AUDIO_UNAVAILABLE` error event tells the UI to let the user answer the written question.
 - The browser plays audio through a FIFO queue so a Full Loop stage narration is never cut off by the next question's clip.
 
 ### Video mode (optional)
 
-With a D-ID key, `start` creates a Talks stream and emits the SDP offer and ICE servers over SSE. The browser builds an `RTCPeerConnection`, posts its answer and ICE candidates to two relay routes, and renders the remote video muted (the ElevenLabs clip is the audio you hear, D-ID provides lip-sync). Text sent before the handshake completes is queued and flushed once the SDP answer arrives, so the first question is not lost. The voice follows the session language. Streams are destroyed on completion, deletion or abandonment.
+With a D-ID key and a video session, the **browser requests an offer on demand**: on mount, after a reload, or when its peer connection fails, it calls `POST /avatar-offer`. The orchestrator tears down any previous stream (offers are single-use), creates a Talks stream and emits the SDP offer and ICE servers as `avatar_stream_ready` over SSE. Creating streams only when a peer connection will actually be negotiated keeps usage inside D-ID's concurrent-stream cap. The browser builds an `RTCPeerConnection`, posts its answer and ICE candidates to two relay routes, and renders the remote video muted (the ElevenLabs clip is the audio you hear, D-ID provides lip-sync).
+
+**Talks are triggered on play**: when a question clip starts playing, the browser calls `POST /avatar-speak` and the orchestrator sends the current line to D-ID, so mouth and voice start together. Text sent before the handshake completes is queued and flushed once the connection is up. The voice follows the session language. Streams are destroyed on completion, deletion or abandonment; a stream whose tab was simply closed lingers until D-ID's idle timeout.
 
 ## SSE event protocol
 
@@ -139,7 +149,7 @@ The Claude client retries 429, 529 and 5xx with backoff, strips code fences, and
 
 ## Mock mode
 
-Mock mode is a request-scoped flag held in `AsyncLocalStorage`, set by the `interviewiq_mock_mode` cookie and ignored in production. Routes wrap their handler in `withMockMode`, and everything spawned inside, including background TTS pre-fetches, inherits the flag. Under mock mode the Claude client returns fixtures (a question set, evaluations that rotate through scores chosen to trigger follow-ups and skips, a report), Whisper returns canned transcripts, ElevenLabs returns a short silent WAV, and D-ID returns a fake offer. The browser uses `speechSynthesis` to read questions aloud so the flow still feels real.
+Mock mode is a request-scoped flag held in `AsyncLocalStorage`, set by the `interviewiq_mock_mode` cookie and ignored in production. Routes wrap their handler in `withMockMode`, and everything spawned inside, including background TTS pre-fetches, inherits the flag. It covers the whole flow, including job parsing and company research (a fictional company, "Northwind Labs"), so a mock run needs no API keys and spends nothing. Under mock mode the Claude client returns fixtures (a parsed job, company intel, a question set, evaluations that rotate through scores chosen to trigger follow-ups and skips, a report), Whisper returns canned transcripts, ElevenLabs returns a short silent WAV, and D-ID returns a fake offer. The browser uses `speechSynthesis` to read questions aloud so the flow still feels real.
 
 ## Data model
 
@@ -167,15 +177,19 @@ Two independent settings:
 
 ## Identity and limits
 
-There is no authentication. A UUID generated in the browser (`clientId`) is stored with each session; listing, deleting and abandoning sessions require it, reading a session or report by id does not. Rate limits are a fixed window per client id or per session, kept in process memory.
+There is no authentication; the app is meant for one person on localhost (see [SECURITY.md](SECURITY.md)). A UUID generated in the browser (`clientId`, in localStorage) is stored with each session and mirrored to a cookie so plain navigations and `EventSource` requests carry it too. Every session route (`/api/sessions/[id]/**`, `/api/interview/[id]/**`) checks that the caller's client id owns the session. Middleware rejects cross-site requests to `/api/*`, so a page you visit elsewhere cannot spend your keys by posting to `localhost`. "Delete all my data" on the History page deletes every session for this client id and clears the saved CV and postings from localStorage.
+
+Rate limits are a fixed window per client id or per session, kept in process memory. The company research cache is keyed by company name only, so it is shared by everyone using one deployment.
 
 ## Process model and deployment
 
-Several components are deliberately in-memory singletons stored on `globalThis` so they survive Next.js hot reloads: the orchestrator registry, the SSE connection map, the TTS cache and the rate limiter. The orchestrator itself is stateless apart from locks; it reloads the session and question list from Postgres on every request, so a process restart or a second process only costs a reconnect.
+Several components are deliberately in-memory singletons stored on `globalThis` so they survive Next.js hot reloads: the orchestrator registry (and its per-session start, answer and report locks), the SSE connection map, the TTS cache and the rate limiter. The orchestrator itself is stateless apart from those locks; it reloads the session and question list from Postgres on every request, so a process restart only costs a reconnect.
+
+**Single-process caveat.** All of that in-memory state is per process. With two processes, an SSE connection, an answer upload and an audio fetch can land on different ones: events go to a registry with no listener, clips 404, rate limits and locks are split. Atomic status transitions in Postgres keep the data consistent, but the live experience breaks. The supported shape is exactly one Node process.
 
 What this means for hosting:
 
-- **A single long-lived Node process** (`next start`, or the `standalone` output in a container) plus Postgres is the supported shape.
+- **A single long-lived Node process** (`pnpm start`, which binds to `127.0.0.1`, or the `standalone` output) plus Postgres, on localhost or behind your own authenticating reverse proxy, is the supported shape.
 - **Multi-instance or serverless** hosting breaks the SSE stream, audio serving and rate limiting, because the three requests involved can land on different instances. Moving audio blobs to object storage and SSE fan-out to a pub/sub channel would be required.
 
 ## Where to look
@@ -190,3 +204,5 @@ What this means for hosting:
 | Recording and playback | `apps/web/hooks/useAudioRecorder.ts`, `apps/web/hooks/useAudioPlayback.ts` |
 | Report assembly | `packages/ai/src/services/report-service.ts` |
 | Mock mode | `packages/ai/src/mock/`, `apps/web/lib/with-mock-mode.ts` |
+| Ownership and rate limits | `apps/web/lib/session-owner.ts`, `apps/web/lib/rate-limit.ts`, `apps/web/middleware.ts` |
+| Video avatar | `packages/ai/src/services/avatar-stream.ts`, `apps/web/hooks/useAvatarStream.ts` |

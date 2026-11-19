@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { clientHeaders } from "@/lib/client-id";
 
 interface AvatarStreamState {
   /** Remote video MediaStream from D-ID (avatar) */
@@ -9,8 +10,6 @@ interface AvatarStreamState {
   isConnected: boolean;
   /** D-ID only sends video frames while the avatar talks; false between talks. */
   hasFrames: boolean;
-  /** Whether the avatar is currently speaking (audio injected) */
-  isSpeaking: boolean;
   /** Error message if connection failed */
   error: string | null;
 }
@@ -28,7 +27,6 @@ const initialState: AvatarStreamState = {
   remoteStream: null,
   isConnected: false,
   hasFrames: false,
-  isSpeaking: false,
   error: null,
 };
 
@@ -122,7 +120,7 @@ export function useAvatarStream(sessionId: string) {
             try {
               await fetch(`/api/interview/${sessionId}/avatar-ice`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: clientHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ candidate: event.candidate }),
               });
             } catch {
@@ -189,7 +187,7 @@ export function useAvatarStream(sessionId: string) {
         // Send SDP answer to server → D-ID
         const res = await fetch(`/api/interview/${sessionId}/avatar-sdp`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: clientHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify({ sdpAnswer: answer }),
         });
         if (!res.ok) {
@@ -205,20 +203,6 @@ export function useAvatarStream(sessionId: string) {
     },
     [sessionId, clearDisconnectTimer],
   );
-
-  /**
-   * Called when `avatar_stream_audio` event arrives — avatar is about to speak.
-   */
-  const onAudioInjected = useCallback(() => {
-    setState((prev) => ({ ...prev, isSpeaking: true }));
-  }, []);
-
-  /**
-   * Called when audio playback ends — avatar stops speaking.
-   */
-  const onAudioEnded = useCallback(() => {
-    setState((prev) => ({ ...prev, isSpeaking: false }));
-  }, []);
 
   /**
    * Called when `avatar_stream_failed` event arrives.
@@ -242,8 +226,6 @@ export function useAvatarStream(sessionId: string) {
     ...state,
     connect,
     disconnect,
-    onAudioInjected,
-    onAudioEnded,
     onStreamFailed,
   };
 }

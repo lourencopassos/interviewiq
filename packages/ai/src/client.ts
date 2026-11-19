@@ -5,6 +5,7 @@ import { mockIntroduction, mockQuestionSet } from "./mock/fixtures/question-set"
 import { getNextMockEvaluation } from "./mock/fixtures/evaluation";
 import { mockCoachingReport } from "./mock/fixtures/report";
 import { getMockStageTransition } from "./mock/fixtures/stage-transition";
+import { requireApiKey } from "./errors";
 
 /**
  * Single place to configure the model. Override with CLAUDE_MODEL.
@@ -18,10 +19,24 @@ export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5";
  */
 export const COACH_MODEL = process.env.COACH_MODEL || "claude-haiku-4-5";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-  maxRetries: 0, // We handle retries ourselves for proper rate limit backoff
-});
+let anthropicClient: { key: string; client: Anthropic } | null = null;
+
+/**
+ * The Anthropic client, created on first use. Throws MissingApiKeyError when
+ * ANTHROPIC_API_KEY is empty so callers get an actionable message instead of
+ * an opaque authentication failure.
+ */
+function anthropic(): Anthropic {
+  const apiKey = requireApiKey("anthropic");
+  if (anthropicClient?.key !== apiKey) {
+    anthropicClient = {
+      key: apiKey,
+      // We handle retries ourselves for proper rate limit backoff
+      client: new Anthropic({ apiKey, maxRetries: 0 }),
+    };
+  }
+  return anthropicClient.client;
+}
 
 const MAX_RETRIES = 3;
 const DEFAULT_RATE_LIMIT_WAIT_MS = 15_000;
@@ -57,7 +72,7 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
       const { retry, waitMs } = isRetryable(error);
       if (!retry || attempt === MAX_RETRIES) throw error;
       const backoff = waitMs * Math.pow(1.5, attempt);
-      console.log(
+      console.warn(
         `[AI] Transient error, waiting ${Math.round(backoff / 1000)}s before retry ${attempt + 1}/${MAX_RETRIES}`,
       );
       await delay(backoff);
@@ -112,12 +127,11 @@ export async function callClaude(
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(300);
-    console.log("[MOCK] callClaude — returning fixture");
     return getMockJsonResponse(systemPrompt);
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: options?.maxTokens ?? 4096,
       ...(options?.tool && {
@@ -159,12 +173,11 @@ export async function callClaudeWithSearch(
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(400);
-    console.log("[MOCK] callClaudeWithSearch — returning fixture");
     return getMockJsonResponse(systemPrompt);
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 4096,
       system: systemPrompt,
@@ -199,12 +212,11 @@ export async function callClaudePlainText(
 ): Promise<string> {
   if (isMockMode()) {
     await delay(250);
-    console.log("[MOCK] callClaudePlainText — returning fixture");
     return getMockStageTransition();
   }
 
   const response = await withRetry(() =>
-    anthropic.messages.create({
+    anthropic().messages.create({
       model: CLAUDE_MODEL,
       max_tokens: options?.maxTokens ?? 4096,
       system: systemPrompt,
@@ -236,7 +248,7 @@ export async function* streamClaudeText(
     return;
   }
 
-  const stream = anthropic.messages.stream({
+  const stream = anthropic().messages.stream({
     model: options.model ?? CLAUDE_MODEL,
     max_tokens: options.maxTokens ?? 1024,
     system: systemPrompt,

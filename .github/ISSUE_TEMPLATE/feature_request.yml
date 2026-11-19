@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an improvement. Start with the problem, not the solution.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: When I practise system design interviews I can't ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: The change you have in mind. Rough is fine.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: textarea
+    id: cost
+    attributes:
+      label: Cost and privacy impact
+      description: Would this add API calls, a new provider, or send more data off the machine?

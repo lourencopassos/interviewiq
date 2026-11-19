@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@interviewiq/db";
 import { getOrCreateOrchestrator, OrchestratorError } from "@interviewiq/ai";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { errorResponse, jsonError } from "@/lib/api-response";
+import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 /** Generous ceiling for a spoken answer (a few minutes of compressed audio). */
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+/** Multipart framing on top of the audio itself. */
+const MAX_BODY_BYTES = MAX_AUDIO_BYTES + 64 * 1024;
 
 export async function POST(
   request: Request,
@@ -13,22 +16,21 @@ export async function POST(
 ) {
   const { id } = await params;
 
+  // Refuse oversized uploads before buffering anything.
+  const declaredLength = Number(request.headers.get("content-length") ?? NaN);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+    return jsonError(413, "TOO_LARGE", "Audio file too large");
+  }
+
   return withMockMode(async () => {
+    const owner = await assertOwner(id, request);
+    if (!owner.ok) return owner.response;
+
     const rl = checkRateLimit(`answer:${id}`, { maxRequests: 30, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    const session = await prisma.session.findUnique({
-      where: { id },
-      select: { status: true },
-    });
-    if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
-    if (session.status !== "INTERVIEWING") {
-      return NextResponse.json(
-        { error: `Session is ${session.status}, not accepting answers`, code: "NOT_INTERVIEWING" },
-        { status: 409 },
-      );
+    if (owner.session.status !== "INTERVIEWING") {
+      return jsonError(409, "NOT_INTERVIEWING", `Session is ${owner.session.status}, not accepting answers`);
     }
 
     let audioFile: Blob;
@@ -36,18 +38,18 @@ export async function POST(
       const formData = await request.formData();
       const field = formData.get("audio");
       if (!field || !(field instanceof Blob)) {
-        return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
+        return jsonError(400, "NO_AUDIO", "No audio file provided");
       }
       audioFile = field;
     } catch {
-      return NextResponse.json({ error: "Invalid multipart body" }, { status: 400 });
+      return jsonError(400, "INVALID_MULTIPART", "Invalid multipart body");
     }
 
     if (audioFile.size === 0) {
-      return NextResponse.json({ error: "Audio file is empty" }, { status: 400 });
+      return jsonError(400, "EMPTY_AUDIO", "Audio file is empty");
     }
     if (audioFile.size > MAX_AUDIO_BYTES) {
-      return NextResponse.json({ error: "Audio file too large" }, { status: 413 });
+      return jsonError(413, "TOO_LARGE", "Audio file too large");
     }
 
     try {
@@ -61,16 +63,7 @@ export async function POST(
       } else {
         console.error("Answer submission failed:", error);
       }
-      if (error instanceof OrchestratorError) {
-        return NextResponse.json(
-          { error: error.message, code: error.code, retryable: error.httpStatus >= 500 },
-          { status: error.httpStatus },
-        );
-      }
-      return NextResponse.json(
-        { error: "Failed to process answer", retryable: true },
-        { status: 500 },
-      );
+      return errorResponse(error, { status: 500, code: "ANSWER_FAILED", error: "Failed to process answer" });
     }
   });
 }

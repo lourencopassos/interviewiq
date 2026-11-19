@@ -5,11 +5,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
-import { getClientId } from "@/lib/client-id";
+import { clientHeaders } from "@/lib/client-id";
 import { interpolate, useI18n } from "@/lib/i18n";
 import { SessionCard } from "@/components/history/session-card";
 import { SessionFilters } from "@/components/history/session-filters";
 import { EmptyState } from "@/components/history/empty-state";
+import { DeleteAllData } from "@/components/history/delete-all-data";
 
 interface SessionItem {
   id: string;
@@ -31,10 +32,8 @@ export default function HistoryPage() {
 
   const fetchSessions = useCallback(async () => {
     try {
-      const clientId = getClientId();
-      if (!clientId) return;
-
-      const res = await fetch(`/api/sessions?clientId=${clientId}`);
+      // Lists every status, drafts (SETUP) and abandoned sessions included.
+      const res = await fetch("/api/sessions", { headers: clientHeaders() });
       if (res.ok) {
         setSessions(await res.json());
       }
@@ -52,13 +51,9 @@ export default function HistoryPage() {
   const deleteErrors = t.history.deleteErrors;
   const handleDelete = useCallback(
     async (id: string) => {
-      const clientId = getClientId();
       let res: Response;
       try {
-        res = await fetch(
-          `/api/sessions/${id}?clientId=${encodeURIComponent(clientId)}`,
-          { method: "DELETE" },
-        );
+        res = await fetch(`/api/sessions/${id}`, { method: "DELETE", headers: clientHeaders() });
       } catch (error) {
         console.error("Failed to delete session:", error);
         throw new Error(deleteErrors.network);
@@ -158,6 +153,8 @@ export default function HistoryPage() {
           ))}
         </div>
       )}
+
+      {!loading && <DeleteAllData onDeleted={() => setSessions([])} />}
     </div>
   );
 }

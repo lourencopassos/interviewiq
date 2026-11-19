@@ -17,7 +17,6 @@ export const history: typeof En = {
   },
   card: {
     outOf: "/100",
-    researching: "investigando",
     resume: "Continuar",
     report: "Informe",
     retake: "Repetir",
@@ -30,6 +29,16 @@ export const history: typeof En = {
     gone: "La sesión ya no existe",
     status: "No se pudo eliminar la sesión ({status})",
     generic: "No se pudo eliminar la sesión",
+  },
+  deleteAll: {
+    eyebrow: "privacidad",
+    body: "Las sesiones, los CV y las transcripciones se guardan en la base de datos de este servidor. Los empleos guardados y tu CV también quedan en este navegador.",
+    button: "Eliminar todos mis datos",
+    confirm: "Eliminar todo",
+    deleting: "Eliminando…",
+    done: "Se eliminaron {n} sesiones del servidor, junto con el CV y los empleos guardados en este navegador.",
+    failed: "No se pudieron eliminar tus datos ({status})",
+    network: "Error de red — no se eliminó nada",
   },
   empty: {
     eyebrow: "[ vacío ]",

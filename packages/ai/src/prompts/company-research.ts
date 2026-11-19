@@ -4,6 +4,9 @@ import {
 } from "@interviewiq/types";
 import { callClaudeWithSearch } from "../client";
 import { recoverWithDefaults } from "./recover";
+import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
+import { delay, isMockMode } from "../mock";
+import { mockCompanyIntel } from "../mock/fixtures/company-intel";
 
 function getCompanyResearchSystemPrompt(companyName: string): string {
   return `You are a senior interview coach preparing a candidate for an interview at ${companyName}.
@@ -24,10 +27,13 @@ Use your web search tool to research the following and return a JSON object:
 
 Search for: "${companyName} engineering blog", "${companyName} tech stack", "${companyName} interview process glassdoor", "${companyName} company culture".
 
-Return ONLY valid JSON. Be specific and factual — no hallucinations. If you cannot find information for a field, use null for strings and empty arrays for arrays.`;
+Return ONLY valid JSON. Be specific and factual — no hallucinations. If you cannot find information for a field, use null for strings and empty arrays for arrays.
+
+The role's key skills arrive inside <key_skills> tags. ${DATA_ONLY_INSTRUCTION}`;
 }
 
-const EMPTY_INTELLIGENCE: CompanyIntelligence = {
+/** Fallback when research fails or finds nothing; interviews proceed without it. */
+export const EMPTY_INTELLIGENCE: CompanyIntelligence = {
   companySize: null,
   fundingStage: null,
   techStack: [],
@@ -44,9 +50,14 @@ export async function researchCompany(
   jobTitle: string,
   primarySkills: string[],
 ): Promise<CompanyIntelligence> {
+  if (isMockMode()) {
+    await delay(400);
+    return mockCompanyIntel;
+  }
+
   try {
     const systemPrompt = getCompanyResearchSystemPrompt(companyName);
-    const userMessage = `Research ${companyName} for a ${jobTitle} position. Key skills: ${primarySkills.join(", ")}`;
+    const userMessage = `Research ${companyName} for a ${jobTitle} position.\n\n${tagged("key_skills", primarySkills.join(", "))}`;
 
     const raw = await callClaudeWithSearch(systemPrompt, userMessage);
     const result = companyIntelligenceSchema.safeParse(raw);

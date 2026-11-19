@@ -25,8 +25,6 @@ interface RecordButtonProps {
   duration: number;
   onStart: () => void;
   onStop: () => void;
-  /** Overrides the phase-derived disabled state when provided. */
-  disabled?: boolean;
 }
 
 /**
@@ -50,11 +48,10 @@ export function RecordButton({
   duration,
   onStart,
   onStop,
-  disabled,
 }: RecordButtonProps) {
   const { t } = useI18n();
   const isRecording = phase === "recording";
-  const isDisabled = disabled ?? (phase !== "ready" && phase !== "recording");
+  const isDisabled = phase !== "ready" && phase !== "recording";
 
   const minutes = Math.floor(duration / 60);
   const seconds = duration % 60;

@@ -1,6 +1,8 @@
+import { normalizeAudioMimeType } from "@interviewiq/types";
 import { isMockMode, delay } from "../mock";
 import { getMockSilenceBuffer } from "../mock/mock-audio";
 import { getNextMockTranscript } from "../mock/fixtures/transcript";
+import { requireApiKey } from "../errors";
 
 // ElevenLabs premade voices. eleven_turbo_v2_5 is multilingual, so any voice can
 // speak any supported language; these are sensible defaults, overridable per language.
@@ -27,28 +29,6 @@ export class AudioPipelineError extends Error {
   }
 }
 
-/** Map a MediaRecorder mime type to something Whisper accepts, with a matching filename extension. */
-function normalizeAudioType(mimeType: string): { type: string; extension: string } {
-  const base = mimeType.split(";")[0].trim().toLowerCase();
-  switch (base) {
-    case "audio/mp4":
-    case "audio/x-m4a":
-    case "audio/m4a":
-      return { type: "audio/mp4", extension: "m4a" };
-    case "audio/ogg":
-      return { type: "audio/ogg", extension: "ogg" };
-    case "audio/wav":
-    case "audio/x-wav":
-      return { type: "audio/wav", extension: "wav" };
-    case "audio/mpeg":
-    case "audio/mp3":
-      return { type: "audio/mpeg", extension: "mp3" };
-    case "audio/webm":
-    default:
-      return { type: "audio/webm", extension: "webm" };
-  }
-}
-
 export class AudioPipeline {
   async transcribe(
     audioBuffer: Buffer,
@@ -57,12 +37,12 @@ export class AudioPipeline {
   ): Promise<string> {
     if (isMockMode()) {
       await delay(200);
-      console.log("[MOCK] transcribe — returning canned transcript");
       return getNextMockTranscript();
     }
 
+    const apiKey = requireApiKey("openai");
     const whisper = WHISPER_BY_LANGUAGE[language] ?? WHISPER_BY_LANGUAGE.EN;
-    const { type, extension } = normalizeAudioType(mimeType);
+    const { type, extension } = normalizeAudioMimeType(mimeType);
 
     try {
       const formData = new FormData();
@@ -80,7 +60,7 @@ export class AudioPipeline {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
           },
           body: formData,
         },
@@ -105,10 +85,10 @@ export class AudioPipeline {
   async synthesize(text: string, language: string): Promise<Buffer> {
     if (isMockMode()) {
       await delay(150);
-      console.log("[MOCK] synthesize — returning silence buffer");
       return getMockSilenceBuffer();
     }
 
+    const apiKey = requireApiKey("elevenlabs");
     const voiceId = VOICE_BY_LANGUAGE[language] ?? VOICE_BY_LANGUAGE.EN;
 
     try {
@@ -118,7 +98,7 @@ export class AudioPipeline {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "xi-api-key": process.env.ELEVENLABS_API_KEY || "",
+            "xi-api-key": apiKey,
           },
           body: JSON.stringify({
             text,

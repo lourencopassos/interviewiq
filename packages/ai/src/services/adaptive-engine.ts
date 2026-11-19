@@ -68,26 +68,4 @@ export class AdaptiveEngine {
 
     return { kind: "question", index: nextIndex, skipped: false };
   }
-
-  /** Average of all scored answers so far. */
-  static runningAverage(scores: Array<number | null | undefined>): number {
-    const valid = scores.filter((s): s is number => typeof s === "number");
-    if (valid.length === 0) return 0;
-    return valid.reduce((a, b) => a + b, 0) / valid.length;
-  }
-
-  /**
-   * Signal when the candidate is clearly above/below the selected difficulty.
-   * Only meaningful after 3+ answers. Informational — surfaced in the report.
-   */
-  static difficultyMismatch(
-    scores: Array<number | null | undefined>,
-  ): "up" | "down" | null {
-    const valid = scores.filter((s): s is number => typeof s === "number");
-    if (valid.length < 3) return null;
-    const avg = AdaptiveEngine.runningAverage(valid);
-    if (avg > 90) return "up";
-    if (avg < 40) return "down";
-    return null;
-  }
 }

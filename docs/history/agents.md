@@ -90,12 +90,12 @@ Frontend subscribes via `useInterviewStream` hook (EventSource + useReducer). Th
 
 | # | Prompt Name | Called By | Phase Doc | Purpose |
 |---|---|---|---|---|
-| 1 | **Job Description Parser** | POST `/api/parse-job` | [phase-1](docs/phase-1-foundation.md) | Extract structured job data from raw text |
-| 2 | **Company Intelligence Research** | POST `/api/research-company` | [phase-1](docs/phase-1-foundation.md) | Web search for company context (uses `web_search` tool) |
-| 3 | **Question Set Generator** | Orchestrator (via `/api/interview/[id]/start`) | [phase-2](docs/phase-2-interview-engine.md) | Generate adaptive interview questions with scoring guides |
-| 4 | **Per-Answer Evaluator** | Orchestrator (after each transcription) | [phase-2](docs/phase-2-interview-engine.md) | Score each answer, identify gaps, generate follow-ups |
-| 5 | **Holistic Report Generator** | Orchestrator (on WRAPPING_UP) | [phase-3](docs/phase-3-report-history.md) | Comprehensive coaching report with study plan |
-| 6 | **Stage Transition Narrator** | Orchestrator (Full Loop between stages) | [phase-3](docs/phase-3-report-history.md) | Natural transition text spoken via TTS (plain text, not JSON) |
+| 1 | **Job Description Parser** | POST `/api/parse-job` | [phase-1](phase-1-foundation.md) | Extract structured job data from raw text |
+| 2 | **Company Intelligence Research** | POST `/api/research-company` | [phase-1](phase-1-foundation.md) | Web search for company context (uses `web_search` tool) |
+| 3 | **Question Set Generator** | Orchestrator (via `/api/interview/[id]/start`) | [phase-2](phase-2-interview-engine.md) | Generate adaptive interview questions with scoring guides |
+| 4 | **Per-Answer Evaluator** | Orchestrator (after each transcription) | [phase-2](phase-2-interview-engine.md) | Score each answer, identify gaps, generate follow-ups |
+| 5 | **Holistic Report Generator** | Orchestrator (on WRAPPING_UP) | [phase-3](phase-3-report-history.md) | Comprehensive coaching report with study plan |
+| 6 | **Stage Transition Narrator** | Orchestrator (Full Loop between stages) | [phase-3](phase-3-report-history.md) | Natural transition text spoken via TTS (plain text, not JSON) |
 
 ### Prompt Design Principles
 
@@ -365,7 +365,7 @@ interface StudyPlanItem {
 
 ## Feature Backlog Maintenance
 
-Feature ideas are tracked in [`docs/FEATURES.md`](docs/FEATURES.md). After completing any feature listed in the backlog:
+Feature ideas are tracked in [`docs/FEATURES.md`](../FEATURES.md). After completing any feature listed in the backlog:
 1. Update its status from `Planned` or `In Progress` to `Completed`
 2. Add a `**Completed**: YYYY-MM-DD` line below the status
 3. If the implementation differed from the original description, add a brief note

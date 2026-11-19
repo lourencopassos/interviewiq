@@ -8,6 +8,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "noEmit": true,
+    "incremental": true,
     "paths": {
       "@/*": ["./*"]
     }

@@ -39,7 +39,7 @@ export interface RateLimitResult {
 
 /**
  * Fixed-window in-memory limiter. Per-process only — adequate for a single
- * Node server, not for multi-instance serverless (see FIXES.md D1).
+ * Node server, not for multi-instance serverless (see "Process model and deployment" in ARCHITECTURE.md).
  */
 export function checkRateLimit(key: string, options: RateLimitOptions): RateLimitResult {
   const now = Date.now();
@@ -75,16 +75,7 @@ export function rateLimitResponse(result?: RateLimitResult) {
     headers["X-RateLimit-Remaining"] = String(result.remaining);
   }
   return NextResponse.json(
-    { error: "Too many requests. Please try again later.", retryable: true },
+    { error: "Too many requests. Please try again later.", code: "RATE_LIMITED", retryable: true },
     { status: 429, headers },
   );
-}
-
-/** Parse a JSON body, returning null instead of throwing on malformed input. */
-export async function readJson<T = unknown>(request: Request): Promise<T | null> {
-  try {
-    return (await request.json()) as T;
-  } catch {
-    return null;
-  }
 }

@@ -1,3 +1,4 @@
+import type { AvatarFailureCode } from "@interviewiq/types";
 import { isMockMode, delay } from "../mock";
 
 const DID_API_BASE = "https://api.d-id.com";
@@ -12,8 +13,15 @@ const DID_VOICE_BY_LANGUAGE: Record<string, string> = {
 /** After the SDP answer arrives, give ICE this long to connect before flushing queued text. */
 const HANDSHAKE_SETTLE_MS = 1_500;
 
+/**
+ * `message` carries provider detail for server logs only; clients get `code`
+ * (mapped to fixed copy) via the `avatar_stream_failed` event.
+ */
 export class AvatarStreamError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public code: AvatarFailureCode = "AVATAR_UNAVAILABLE",
+  ) {
     super(message);
     this.name = "AvatarStreamError";
   }
@@ -54,6 +62,8 @@ export class AvatarStream {
   private handshakeComplete = false;
   private pendingTexts: string[] = [];
   private flushing: Promise<void> | null = null;
+  /** Whether the current stream is the mock-mode stand-in rather than a real D-ID stream. */
+  private createdInMock = false;
 
   constructor(language: string = "EN") {
     this.apiKey = process.env.DID_API_KEY || "";
@@ -74,6 +84,7 @@ export class AvatarStream {
   async createStream(presenterImageUrl?: string): Promise<StreamSession> {
     if (isMockMode()) {
       await delay(100);
+      this.createdInMock = true;
       this.streamId = "mock-stream";
       this.handshakeComplete = true;
       return {
@@ -99,14 +110,17 @@ export class AvatarStream {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const quota = response.status === 403 && /max (user )?sessions/i.test(errorText);
       throw new AvatarStreamError(
-        response.status === 403 && /max (user )?sessions/i.test(errorText)
+        quota
           ? "D-ID concurrent stream limit reached; earlier streams must expire before a new one can start."
           : `D-ID create stream failed (${response.status}): ${errorText}`,
+        quota ? "AVATAR_QUOTA" : response.status === 402 ? "AVATAR_NO_CREDITS" : "AVATAR_UNAVAILABLE",
       );
     }
 
     const data = await response.json();
+    this.createdInMock = false;
     this.streamId = data.id;
     this.sessionId = data.session_id;
 
@@ -124,7 +138,7 @@ export class AvatarStream {
    * moment to settle.
    */
   async sendSdpAnswer(sdpAnswer: SDPDescriptionInit): Promise<void> {
-    if (isMockMode() || !this.streamId) return;
+    if (this.isMockStream || !this.streamId) return;
 
     const response = await fetch(
       `${DID_API_BASE}/talks/streams/${this.streamId}/sdp`,
@@ -151,7 +165,7 @@ export class AvatarStream {
 
   /** Send an ICE candidate to D-ID for the WebRTC connection. */
   async sendIceCandidate(candidate: ICECandidateInit): Promise<void> {
-    if (isMockMode() || !this.streamId) return;
+    if (this.isMockStream || !this.streamId) return;
 
     const response = await fetch(
       `${DID_API_BASE}/talks/streams/${this.streamId}/ice`,
@@ -181,9 +195,8 @@ export class AvatarStream {
    * question is not lost while the browser is still negotiating.
    */
   async sendText(text: string): Promise<void> {
-    if (isMockMode()) {
+    if (this.isMockStream) {
       await delay(50);
-      console.log("[MOCK] avatar stream — simulated text injection");
       return;
     }
 
@@ -239,6 +252,7 @@ export class AvatarStream {
         response.status === 402
           ? "D-ID account has no credits left; the avatar can't speak (video falls back to the still image)."
           : `D-ID stream text injection failed (${response.status}): ${errorText}`,
+        response.status === 402 ? "AVATAR_NO_CREDITS" : "AVATAR_UNAVAILABLE",
       );
     }
   }
@@ -246,9 +260,10 @@ export class AvatarStream {
   /** Close the stream session and tear down the WebRTC connection. */
   async destroy(): Promise<void> {
     this.pendingTexts = [];
-    if (isMockMode() || !this.streamId || this.streamId === "mock-stream") {
+    if (this.createdInMock || !this.streamId) {
       this.streamId = null;
       this.sessionId = null;
+      this.createdInMock = false;
       return;
     }
 
@@ -268,6 +283,20 @@ export class AvatarStream {
       this.sessionId = null;
       this.handshakeComplete = false;
     }
+  }
+
+  /**
+   * True when this request runs in mock mode or the stream itself is the mock
+   * stand-in. Either way nothing may reach D-ID: a mock stream id is fake, and
+   * a mock-mode request must not spend credits on a real stream.
+   */
+  private get isMockStream(): boolean {
+    return this.createdInMock || isMockMode();
+  }
+
+  /** Whether the current stream was created in mock mode (see InterviewOrchestrator). */
+  get mock(): boolean {
+    return this.createdInMock;
   }
 
   get isActive(): boolean {

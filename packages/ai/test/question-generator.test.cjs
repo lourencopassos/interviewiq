@@ -1,4 +1,6 @@
 // Run with node --require tsx/cjs --test packages/ai/test/question-generator.test.cjs
+// The client refuses to call Claude without a key; the model call itself is mocked below.
+process.env.ANTHROPIC_API_KEY ||= "test-key";
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { Messages } = require("@anthropic-ai/sdk/resources/messages");

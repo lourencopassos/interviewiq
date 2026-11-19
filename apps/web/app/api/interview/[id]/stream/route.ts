@@ -1,5 +1,6 @@
-import { prisma } from "@interviewiq/db";
 import { getOrCreateOrchestrator, sseEmitter } from "@interviewiq/ai";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { assertOwner } from "@/lib/session-owner";
 import { withMockMode } from "@/lib/with-mock-mode";
 
 export const dynamic = "force-dynamic";
@@ -11,18 +12,22 @@ export const dynamic = "force-dynamic";
  * current question + audio, or completion), so events emitted while the client
  * was not subscribed are never permanently lost. The emitter sends a `: ping`
  * comment every 15s so proxies keep the connection open.
+ *
+ * Ownership is checked via the client cookie (EventSource can't send headers).
+ * Replay can synthesize audio, so connects are rate limited per session.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   return withMockMode(async () => {
-    const exists = await prisma.session.findUnique({ where: { id }, select: { id: true } });
-    if (!exists) {
-      return new Response("Session not found", { status: 404 });
-    }
+    const owner = await assertOwner(id, request);
+    if (!owner.ok) return owner.response;
+
+    const rl = checkRateLimit(`stream:${id}`, { maxRequests: 20, windowMs: 60_000 });
+    if (!rl.allowed) return rateLimitResponse(rl);
 
     let registered: ReadableStreamDefaultController | null = null;
 

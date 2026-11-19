@@ -43,7 +43,7 @@ function detectContentType(buffer: Buffer): string {
  * - Both are scoped per session so finishing one interview never evicts another's audio.
  *
  * This lives in process memory: it is correct for a single long-lived Node server
- * and NOT for multi-instance serverless deployments (see FIXES.md D1).
+ * and NOT for multi-instance serverless deployments (see "Process model and deployment" in ARCHITECTURE.md).
  */
 export class TTSCache {
   private questionCache: Map<string, PrefetchedAudio> = new Map();

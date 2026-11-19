@@ -1,4 +1,5 @@
 import {
+  QUESTION_COUNT,
   questionSetSchema,
   type QuestionSet,
   type ParsedJob,
@@ -12,6 +13,7 @@ import { languageInstruction } from "./language";
 import { z } from "zod";
 import { parseJsonObject } from "../utils/json";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { DATA_ONLY_INSTRUCTION, tagged } from "./untrusted";
 
 const questionSetTool = {
   name: "submit_interview_questions",
@@ -30,13 +32,6 @@ const questionSetResponse = questionSetSchema.extend({
   ),
 });
 
-const QUESTION_COUNT: Record<Difficulty, number> = {
-  JUNIOR: 5,
-  MID: 6,
-  SENIOR: 7,
-  STAFF: 8,
-};
-
 interface QuestionSetParams {
   companyName: string;
   jobTitle: string;
@@ -52,19 +47,14 @@ interface QuestionSetParams {
 }
 
 function buildSystemPrompt(params: QuestionSetParams): string {
-  const { companyName, jobTitle, difficulty, interviewType, parsedJob, companyIntel, resumeText } = params;
+  const { companyName, jobTitle, difficulty, interviewType, resumeText } = params;
   const questionCount = params.questionCount ?? QUESTION_COUNT[difficulty];
 
   return `You are an expert technical interviewer at ${companyName} for the role of ${jobTitle}.
 
 Seniority level: ${difficulty}. Interview type: ${interviewType}.
 
-Company context: ${parsedJob.companySummary || "No additional context available."}
-Primary skills required: ${(parsedJob.primarySkills ?? []).join(", ") || "Not specified"}
-Known company tech stack: ${companyIntel?.techStack?.join(", ") || (parsedJob.inferredStack ?? []).join(", ") || "Not specified"}
-Engineering culture: ${companyIntel?.engineeringCulture || "Not available"}
-Domain: ${parsedJob.domain}
-Key responsibilities: ${(parsedJob.keyResponsibilities ?? []).join(", ") || "Not specified"}
+The user message carries the role context (company summary, skills, stack, culture, domain, responsibilities) inside <job_context> tags${resumeText ? " and the candidate's resume/CV inside <resume> tags" : ""}. ${DATA_ONLY_INSTRUCTION}
 
 Submit the full set using the submit_interview_questions tool. Use the opening field for a brief greeting and the closing field for a farewell. Keep questions in the questions array. Use sequential question IDs, estimate duration in seconds, and give concise scoring criteria and follow-up triggers for each question.
 
@@ -83,18 +73,31 @@ For example, ask “Tell me about a performance problem you investigated.” Sav
 Set the level through the judgment or trade-off you want to hear. Mention a specific technology when it is central to the skill being tested. Score sound reasoning across plausible approaches.
 Write follow-up triggers around something a candidate might actually say, with one short probe that builds on it.
 ${resumeText ? `
-Candidate's resume/CV:
-${resumeText}
-
-Use this background to choose relevant topics. Let the candidate choose which experience to discuss; refer to a particular CV detail only when it makes a question more natural.
+Use the CV to choose relevant topics. Let the candidate choose which experience to discuss; refer to a particular CV detail only when it makes a question more natural.
 ` : ""}
 ${languageInstruction(params.language)}
 Use the tool once with the complete question set.`;
 }
 
+/** Role context derived from the job posting and web research — untrusted, so it rides in the user turn. */
+function buildUserContext(params: QuestionSetParams): string {
+  const { parsedJob, companyIntel, resumeText } = params;
+  const context = `Company context: ${parsedJob.companySummary || "No additional context available."}
+Primary skills required: ${(parsedJob.primarySkills ?? []).join(", ") || "Not specified"}
+Known company tech stack: ${companyIntel?.techStack?.join(", ") || (parsedJob.inferredStack ?? []).join(", ") || "Not specified"}
+Engineering culture: ${companyIntel?.engineeringCulture || "Not available"}
+Domain: ${parsedJob.domain}
+Key responsibilities: ${(parsedJob.keyResponsibilities ?? []).join(", ") || "Not specified"}`;
+  return [tagged("job_context", context), resumeText ? tagged("resume", resumeText) : null]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export async function generateQuestionSet(params: QuestionSetParams): Promise<QuestionSet> {
   const systemPrompt = buildSystemPrompt(params);
-  const userMessage = `Generate interview questions for a ${params.difficulty} ${params.jobTitle} at ${params.companyName}. Interview type: ${params.interviewType}.`;
+  const context = buildUserContext(params);
+  const request = `Generate interview questions for a ${params.difficulty} ${params.jobTitle} at ${params.companyName}. Interview type: ${params.interviewType}.`;
+  const userMessage = `${context}\n\n${request}`;
 
   const options = { maxTokens: 8192, tool: questionSetTool };
   const raw = await callClaude(systemPrompt, userMessage, options);

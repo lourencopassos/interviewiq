@@ -5,7 +5,15 @@
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "ELEVENLABS_API_KEY",
-    "DATABASE_URL"
+    "DATABASE_URL",
+    "CLAUDE_MODEL",
+    "COACH_MODEL",
+    "DID_API_KEY",
+    "DID_PRESENTER_URL",
+    "ELEVENLABS_VOICE_EN",
+    "ELEVENLABS_VOICE_PT_BR",
+    "ELEVENLABS_VOICE_ES",
+    "POSTGRES_PASSWORD"
   ],
   "tasks": {
     "build": {
@@ -16,8 +24,13 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {
-      "dependsOn": ["^build"]
+    "lint": {},
+    "typecheck": {
+      "outputs": []
+    },
+    "test": {
+      "cache": false,
+      "outputs": []
     },
     "db:push": {
       "cache": false

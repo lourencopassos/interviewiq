@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { CoachingReport, CoachNoteView } from "@interviewiq/types";
 import { interpolate, LOCALE_TAGS, useI18n, type Dictionary } from "@/lib/i18n";
+import { clientHeaders } from "@/lib/client-id";
 import { VerdictBanner } from "@/components/report/verdict-banner";
 import { DimensionScores } from "@/components/report/dimension-scores";
 import { StrengthsImprovements } from "@/components/report/strengths-improvements";
@@ -27,8 +28,6 @@ interface ReportData {
     interviewType: string;
     language: string;
     status: string;
-    /** Not part of the payload today; rendered in the title strip when present. */
-    createdAt?: string;
     /** Whether the in-interview coach was available. Older payloads omit it (treated as on). */
     coachEnabled?: boolean;
   };
@@ -79,14 +78,6 @@ type ViewState =
   | { kind: "not_found" }
   | { kind: "error"; message: ErrorMessage };
 
-function formatDate(iso: string, localeTag: string): string {
-  return new Date(iso).toLocaleDateString(localeTag, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useI18n();
@@ -110,7 +101,7 @@ export default function ReportPage() {
 
       let res: Response;
       try {
-        res = await fetch(`/api/sessions/${id}/report`);
+        res = await fetch(`/api/sessions/${id}/report`, { headers: clientHeaders() });
       } catch {
         if (!cancelled) {
           setView({ kind: "error", message: { key: "network" } });
@@ -125,7 +116,8 @@ export default function ReportPage() {
         return;
       }
 
-      if (res.status === 404) {
+      // 403: the session belongs to another browser; show it as not found.
+      if (res.status === 404 || res.status === 403) {
         setView({ kind: "not_found" });
         return;
       }
@@ -180,7 +172,7 @@ export default function ReportPage() {
     setRegenerating(true);
     setRegenerateError(null);
     try {
-      const res = await fetch(`/api/sessions/${id}/report`, { method: "POST" });
+      const res = await fetch(`/api/sessions/${id}/report`, { method: "POST", headers: clientHeaders() });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setRegenerateError(
@@ -330,13 +322,7 @@ export default function ReportPage() {
           {session.coachEnabled === false && (
             <span className="pill bg-transparent text-muted-foreground">{t.report.coach.coachOff}</span>
           )}
-          {session.createdAt ? (
-            <span className="pill bg-card tabular-nums">
-              {formatDate(session.createdAt, localeTag)}
-            </span>
-          ) : (
-            <span className="pill bg-card">{languageLabel}</span>
-          )}
+          <span className="pill bg-card">{languageLabel}</span>
         </div>
       </header>
 
@@ -400,7 +386,7 @@ export default function ReportPage() {
       )}
 
       {/* Actions */}
-      <ReportActions sessionId={session.id} />
+      <ReportActions />
     </div>
   );
 }

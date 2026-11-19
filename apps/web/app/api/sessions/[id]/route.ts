@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@interviewiq/db";
 import { destroyOrchestrator } from "@interviewiq/ai";
 import { updateSessionRequestSchema } from "@interviewiq/types";
-import { readJson } from "@/lib/rate-limit";
-
+import { readJson } from "@/lib/http";
+import { jsonError } from "@/lib/api-response";
 import { assertOwner } from "@/lib/session-owner";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const owner = await assertOwner(id, request);
+  if (!owner.ok) return owner.response;
 
   try {
     const session = await prisma.session.findUnique({
@@ -31,13 +33,13 @@ export async function GET(
     });
 
     if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      return jsonError(404, "NOT_FOUND", "Session not found");
     }
 
     return NextResponse.json(session);
   } catch (error) {
     console.error("Session fetch failed:", error);
-    return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });
+    return jsonError(500, "FAILED", "Failed to fetch session");
   }
 }
 
@@ -52,20 +54,16 @@ export async function PATCH(
   const { id } = await params;
   const parsed = updateSessionRequestSchema.safeParse(await readJson(request));
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Only { clientId, status: "ABANDONED" } is supported', details: parsed.error.flatten() },
-      { status: 400 },
-    );
+    return jsonError(400, "INVALID_REQUEST", 'Only { status: "ABANDONED" } is supported', {
+      details: parsed.error.flatten(),
+    });
   }
 
-  const owner = await assertOwner(id, parsed.data.clientId);
+  const owner = await assertOwner(id, request, parsed.data.clientId);
   if (!owner.ok) return owner.response;
 
   if (owner.session.status === "COMPLETED") {
-    return NextResponse.json(
-      { error: "A completed session cannot be abandoned" },
-      { status: 409 },
-    );
+    return jsonError(409, "ALREADY_COMPLETED", "A completed session cannot be abandoned");
   }
 
   try {
@@ -73,12 +71,12 @@ export async function PATCH(
       where: { id, status: { not: "COMPLETED" } },
       data: { status: "ABANDONED" },
     });
-    if (!session.count) return NextResponse.json({ error: "Session already completed" }, { status: 409 });
+    if (!session.count) return jsonError(409, "ALREADY_COMPLETED", "Session already completed");
     await destroyOrchestrator(id);
-    return NextResponse.json(await prisma.session.findUnique({ where: { id } }));
+    return NextResponse.json({ id, status: "ABANDONED" });
   } catch (error) {
     console.error("Session update failed:", error);
-    return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+    return jsonError(500, "FAILED", "Failed to update session");
   }
 }
 
@@ -87,9 +85,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const clientId = new URL(request.url).searchParams.get("clientId");
-
-  const owner = await assertOwner(id, clientId);
+  const owner = await assertOwner(id, request);
   if (!owner.ok) return owner.response;
 
   try {
@@ -98,6 +94,6 @@ export async function DELETE(
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Session delete failed:", error);
-    return NextResponse.json({ error: "Failed to delete session" }, { status: 500 });
+    return jsonError(500, "FAILED", "Failed to delete session");
   }
 }

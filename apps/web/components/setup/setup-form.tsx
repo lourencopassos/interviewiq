@@ -13,6 +13,7 @@ import { JobPreviewCard } from "./job-preview-card";
 import { StartInterviewButton } from "./start-interview-button";
 import { VideoModeToggle } from "./video-mode-toggle";
 import { CoachToggle } from "./coach-toggle";
+import { JOB_DESCRIPTION_MIN_LENGTH } from "@interviewiq/types";
 
 /**
  * Two columns on desktop. Left: the posting (hero input) and the analysis log.
@@ -23,7 +24,7 @@ export function SetupForm() {
   const { t } = useI18n();
   const { step, restored, error, jobDescription, analyzeJob, reset } = useSetupStore();
   const canAnalyze =
-    jobDescription.length >= 50 && (step === "input" || step === "error");
+    jobDescription.length >= JOB_DESCRIPTION_MIN_LENGTH && (step === "input" || step === "error");
   const isAnalyzing = step === "parsing" || step === "researching";
 
   // Store-emitted codes get localized copy; raw server messages show as-is.

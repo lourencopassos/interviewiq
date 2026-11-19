@@ -10,7 +10,7 @@ import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useAvatarStream } from "@/hooks/useAvatarStream";
 import { useCoach } from "@/hooks/useCoach";
-import { getClientId } from "@/lib/client-id";
+import { clientHeaders } from "@/lib/client-id";
 import { getMockMode } from "@/lib/mock-mode";
 import { InterviewHeader } from "@/components/interview/interview-header";
 import { QuestionCard } from "@/components/interview/question-card";
@@ -97,7 +97,6 @@ export default function InterviewPage() {
   } | null>(null);
   const [paused, setPaused] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
-  const [startStack, setStartStack] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -126,16 +125,22 @@ export default function InterviewPage() {
       lastActionRef.current = "start";
       setIsStarting(true);
       setStartError(null);
-      setStartStack(null);
       try {
-        const res = await fetch(`/api/interview/${id}/start`, { method: "POST" });
+        const res = await fetch(`/api/interview/${id}/start`, { method: "POST", headers: clientHeaders() });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          setStartStack(typeof data?.stack === "string" ? data.stack : null);
+          const copy = tRef.current.interview;
+          const known =
+            typeof data?.code === "string"
+              ? (copy.serverErrors as Record<string, string>)[data.code]
+              : undefined;
           throw new Error(
-            typeof data?.error === "string"
-              ? data.error
-              : interpolate(tRef.current.interview.errors.startFailedStatus, { status: res.status }),
+            res.status === 403 || res.status === 404
+              ? copy.errors.notFound
+              : known ??
+                  (typeof data?.error === "string"
+                    ? data.error
+                    : interpolate(copy.errors.startFailedStatus, { status: res.status })),
           );
         }
       } catch (err) {
@@ -167,7 +172,7 @@ export default function InterviewPage() {
   useEffect(() => {
     async function fetchMeta() {
       try {
-        const res = await fetch(`/api/sessions/${id}`);
+        const res = await fetch(`/api/sessions/${id}`, { headers: clientHeaders() });
         if (res.ok) {
           const data = await res.json();
           setSessionMeta({
@@ -215,7 +220,7 @@ export default function InterviewPage() {
       fired = true;
       lastOfferAtRef.current = Date.now();
       offerAttemptsRef.current += 1;
-      void fetch(`/api/interview/${id}/avatar-offer`, { method: "POST" }).catch(() => {});
+      void fetch(`/api/interview/${id}/avatar-offer`, { method: "POST", headers: clientHeaders() }).catch(() => {});
     }, delay);
     return () => {
       if (!fired) clearTimeout(timer);
@@ -234,18 +239,14 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.avatarStreamData]);
 
-  // Handle avatar stream audio injection event
-  useEffect(() => {
-    if (interview.avatarSpeaking) {
-      avatarStream.onAudioInjected();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interview.avatarSpeaking]);
-
   // Handle avatar stream failure
   useEffect(() => {
     if (interview.avatarFailed) {
-      avatarStream.onStreamFailed("Avatar stream failed");
+      const serverErrors = tRef.current.interview.serverErrors as Record<string, string>;
+      avatarStream.onStreamFailed(
+        (interview.avatarFailureCode && serverErrors[interview.avatarFailureCode]) ??
+          serverErrors.AVATAR_UNAVAILABLE,
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.avatarFailed]);
@@ -253,14 +254,6 @@ export default function InterviewPage() {
   const questionId = interview.currentQuestion?.questionId;
   const pendingNarration = useRef<string | null>(null);
   const questionNarration = useRef<string | null>(null);
-
-  // Sync avatar speaking state with audio playback ending
-  useEffect(() => {
-    if (!playback.isPlaying && avatarStream.isSpeaking) {
-      avatarStream.onAudioEnded();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playback.isPlaying]);
 
   // Handle transition text
   useEffect(() => {
@@ -291,7 +284,7 @@ export default function InterviewPage() {
     setPhase("speaking");
     // Video mode: make the avatar lip-sync the same line as the audio starts.
     if (isVideoMode && avatarStream.isConnected) {
-      void fetch(`/api/interview/${id}/avatar-speak`, { method: "POST" }).catch(() => {});
+      void fetch(`/api/interview/${id}/avatar-speak`, { method: "POST", headers: clientHeaders() }).catch(() => {});
     }
     if (questionNarration.current) {
       void playback.enqueue(questionNarration.current).catch(() => {});
@@ -504,8 +497,8 @@ export default function InterviewPage() {
     try {
       const response = await fetch(`/api/sessions/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "ABANDONED", clientId: getClientId() }),
+        headers: clientHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ status: "ABANDONED" }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -604,6 +597,15 @@ export default function InterviewPage() {
       interview.error.message)
     : null;
 
+  // Coach failures with a known code get interface-language copy too.
+  const coachError = coach.error
+    ? {
+        ...coach.error,
+        message:
+          (t.interview.serverErrors as Record<string, string>)[coach.error.code] ?? coach.error.message,
+      }
+    : null;
+
   // Inline error alerts (rendered in both the loading view and the main layout)
   const errorAlerts = (
     <>
@@ -641,12 +643,6 @@ export default function InterviewPage() {
           <AlertTitle>{t.interview.alerts.start.title}</AlertTitle>
           <AlertDescription className="space-y-3">
             <p className="whitespace-pre-wrap break-words">{startError}</p>
-            {startStack && (
-              <details>
-                <summary className="cursor-pointer">{t.interview.errors.stackTrace}</summary>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all text-xs">{startStack}</pre>
-              </details>
-            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
@@ -1008,7 +1004,7 @@ export default function InterviewPage() {
           currentQuestionId={interview.currentQuestion?.questionId ?? null}
           draft={coach.draft}
           isStreaming={coach.isStreaming}
-          error={coach.error}
+          error={coachError}
           onAsk={handleAskCoach}
           onCancel={coach.cancel}
           modelLabel={isMock ? "mock" : (coach.model ?? "…")}

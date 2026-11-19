@@ -1,6 +1,13 @@
 import { prisma } from "@interviewiq/db";
-import { coachingReportSchema, type CoachingReport, type CoachNoteView } from "@interviewiq/types";
+import {
+  coachingReportSchema,
+  sanitizeReportUrls,
+  sanitizeStudyPlanUrls,
+  type CoachingReport,
+  type CoachNoteView,
+} from "@interviewiq/types";
 import { isString, parseJsonArray, parseJsonObject } from "../utils/json";
+import { toCoachNoteView } from "./coach-service";
 
 export interface ReportQuestionView {
   id: string;
@@ -71,7 +78,7 @@ function reportFromColumns(r: {
     },
     strengths: parseJsonArray<CoachingReport["strengths"][number]>(r.strengths),
     areasToImprove: parseJsonArray<CoachingReport["areasToImprove"][number]>(r.weaknesses),
-    studyPlan: parseJsonArray<CoachingReport["studyPlan"][number]>(r.studyPlan),
+    studyPlan: sanitizeStudyPlanUrls(parseJsonArray<CoachingReport["studyPlan"][number]>(r.studyPlan)),
     nextInterviewTips: [],
     companyCultureFit: "",
     estimatedRetakeReadiness: 14,
@@ -112,23 +119,14 @@ export async function getReportPayload(sessionId: string): Promise<ReportPayload
   if (!session) return { kind: "not_found" };
   if (!session.report) return { kind: "not_ready", status: session.status };
 
-  const parsed = coachingReportSchema.safeParse(parseJsonObject(session.report.summary));
+  // Reports stored before URLs were validated may hold non-https links; null them rather than discard the report.
+  const parsed = coachingReportSchema.safeParse(sanitizeReportUrls(parseJsonObject(session.report.summary)));
   const report = parsed.success ? parsed.data : reportFromColumns(session.report);
 
   const notesByQuestion = new Map<string, CoachNoteView[]>();
   for (const n of session.coachNotes) {
     if (!n.questionId) continue;
-    const view: CoachNoteView = {
-      id: n.id,
-      questionId: n.questionId,
-      source: n.source as CoachNoteView["source"],
-      selection: n.selection,
-      prompt: n.prompt,
-      answer: n.answer,
-      askedBeforeAnswer: n.askedBeforeAnswer,
-      model: n.model,
-      createdAt: n.createdAt.toISOString(),
-    };
+    const view = toCoachNoteView(n);
     notesByQuestion.set(n.questionId, [...(notesByQuestion.get(n.questionId) ?? []), view]);
   }
 

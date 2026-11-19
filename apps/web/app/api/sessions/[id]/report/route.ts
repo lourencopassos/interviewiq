@@ -3,21 +3,19 @@ import { prisma } from "@interviewiq/db";
 import {
   getOrCreateOrchestrator,
   getReportPayload,
-  OrchestratorError,
   type ReportPayload,
 } from "@interviewiq/ai";
 import { withMockMode } from "@/lib/with-mock-mode";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { errorResponse, jsonError } from "@/lib/api-response";
+import { assertOwner } from "@/lib/session-owner";
 
 function toResponse(payload: ReportPayload) {
   switch (payload.kind) {
     case "not_found":
-      return NextResponse.json({ error: "Session not found", code: "NOT_FOUND" }, { status: 404 });
+      return jsonError(404, "NOT_FOUND", "Session not found");
     case "not_ready":
-      return NextResponse.json(
-        { error: "Report not yet generated", code: "NOT_READY", status: payload.status },
-        { status: 202 },
-      );
+      return jsonError(202, "NOT_READY", "Report not yet generated", { status: payload.status });
     case "ready":
       return NextResponse.json({
         report: payload.report,
@@ -28,15 +26,18 @@ function toResponse(payload: ReportPayload) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const owner = await assertOwner(id, request);
+  if (!owner.ok) return owner.response;
+
   try {
     return toResponse(await getReportPayload(id));
   } catch (error) {
     console.error("Report fetch failed:", error);
-    return NextResponse.json({ error: "Failed to fetch report", code: "FAILED" }, { status: 500 });
+    return jsonError(500, "FAILED", "Failed to fetch report");
   }
 }
 
@@ -45,12 +46,15 @@ export async function GET(
  * report is returned as-is.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
   return withMockMode(async () => {
+    const owner = await assertOwner(id, request);
+    if (!owner.ok) return owner.response;
+
     const rl = checkRateLimit(`report:${id}`, { maxRequests: 5, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
@@ -59,16 +63,13 @@ export async function POST(
       select: { status: true, report: { select: { id: true } } },
     });
     if (!session) {
-      return NextResponse.json({ error: "Session not found", code: "NOT_FOUND" }, { status: 404 });
+      return jsonError(404, "NOT_FOUND", "Session not found");
     }
     if (session.report) {
       return toResponse(await getReportPayload(id));
     }
     if (session.status !== "WRAPPING_UP" && session.status !== "COMPLETED") {
-      return NextResponse.json(
-        { error: `Interview is ${session.status}; finish it before generating a report`, code: "NOT_FINISHED" },
-        { status: 409 },
-      );
+      return jsonError(409, "NOT_FINISHED", `Interview is ${session.status}; finish it before generating a report`);
     }
 
     try {
@@ -76,13 +77,11 @@ export async function POST(
       return toResponse(await getReportPayload(id));
     } catch (error) {
       console.error("Report regeneration failed:", error);
-      if (error instanceof OrchestratorError) {
-        return NextResponse.json({ error: error.message, code: error.code }, { status: error.httpStatus });
-      }
-      return NextResponse.json(
-        { error: "Report generation failed. Please try again.", code: "FAILED", retryable: true },
-        { status: 500 },
-      );
+      return errorResponse(error, {
+        status: 500,
+        code: "FAILED",
+        error: "Report generation failed. Please try again.",
+      });
     }
   });
 }
