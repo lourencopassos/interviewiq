@@ -2,7 +2,7 @@ import type { QuestionSet } from "@interviewiq/types";
 
 export const mockQuestionSet: QuestionSet = {
   opening:
-    "Hi there! Thanks for taking the time to interview with us today. I'm excited to learn more about your experience. We'll go through a mix of technical and behavioral questions. Feel free to think out loud — there are no trick questions here. Ready to get started?",
+    "Hi there! Thanks for taking the time to interview with us today. I'm excited to learn more about your experience. We'll go through a mix of technical and behavioral questions. Feel free to think out loud — there are no trick questions here. Let's get started.",
   questions: [
     {
       id: "mock-q1",
@@ -133,4 +133,19 @@ export const mockQuestionSet: QuestionSet = {
   ],
   closing:
     "That wraps up our questions for today. You did a great job — I appreciate your thoughtful answers. We'll have a detailed coaching report ready for you shortly with specific feedback and study recommendations. Thanks again for your time!",
+};
+
+export const mockIntroduction: QuestionSet["questions"][number] = {
+  id: "mock-q1",
+  text: "To get started, could you tell me a little about your background?",
+  category: "behavioral",
+  targetSkill: "Professional introduction",
+  difficulty: 1,
+  expectedDuration: 60,
+  followUpTriggers: [],
+  scoringGuide: {
+    poor: "Gives little sense of their background.",
+    good: "Summarizes relevant experience clearly.",
+    excellent: "Gives a concise overview that helps the interviewer understand their path to this role.",
+  },
 };

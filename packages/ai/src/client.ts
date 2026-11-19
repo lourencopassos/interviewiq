@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 import { isMockMode, delay } from "./mock";
-import { mockQuestionSet } from "./mock/fixtures/question-set";
+import { mockIntroduction, mockQuestionSet } from "./mock/fixtures/question-set";
 import { getNextMockEvaluation } from "./mock/fixtures/evaluation";
 import { mockCoachingReport } from "./mock/fixtures/report";
 import { getMockStageTransition } from "./mock/fixtures/stage-transition";
@@ -71,7 +71,9 @@ function getMockJsonResponse(systemPrompt: string): unknown {
   const prompt = systemPrompt.toLowerCase();
 
   if (prompt.includes("question set") || prompt.includes("interview question")) {
-    return mockQuestionSet;
+    return prompt.includes("question 1 a self-introduction")
+      ? { ...mockQuestionSet, questions: [mockIntroduction, ...mockQuestionSet.questions.slice(1)] }
+      : mockQuestionSet;
   }
   if (prompt.includes("evaluate") || prompt.includes("candidate's answer")) {
     return getNextMockEvaluation();
@@ -106,7 +108,7 @@ function cleanJsonResponse(text: string): string {
 export async function callClaude(
   systemPrompt: string,
   userMessage: string,
-  options?: { maxTokens?: number },
+  options?: { maxTokens?: number; tool?: Anthropic.Messages.Tool },
 ): Promise<unknown> {
   if (isMockMode()) {
     await delay(300);
@@ -118,10 +120,26 @@ export async function callClaude(
     anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: options?.maxTokens ?? 4096,
+      ...(options?.tool && {
+        tools: [options.tool],
+        tool_choice: { type: "tool" as const, name: options.tool.name },
+      }),
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),
   );
+
+  if (options?.tool) {
+    const name = options.tool.name;
+    if (response.stop_reason === "tool_use") {
+      for (const block of response.content) {
+        if (block.type === "tool_use" && block.name === name) return block.input;
+      }
+    }
+    throw new Error(
+      `Claude did not finish ${name} (model ${response.model}, stop reason ${response.stop_reason}, output tokens ${response.usage.output_tokens}).`,
+    );
+  }
 
   const rawText = extractTextContent(response.content);
   const cleaned = cleanJsonResponse(rawText);
