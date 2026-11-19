@@ -69,12 +69,13 @@ export async function PATCH(
   }
 
   try {
-    const session = await prisma.session.update({
-      where: { id },
+    const session = await prisma.session.updateMany({
+      where: { id, status: { not: "COMPLETED" } },
       data: { status: "ABANDONED" },
     });
+    if (!session.count) return NextResponse.json({ error: "Session already completed" }, { status: 409 });
     await destroyOrchestrator(id);
-    return NextResponse.json(session);
+    return NextResponse.json(await prisma.session.findUnique({ where: { id } }));
   } catch (error) {
     console.error("Session update failed:", error);
     return NextResponse.json({ error: "Failed to update session" }, { status: 500 });

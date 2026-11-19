@@ -19,21 +19,21 @@ export async function POST(
     const rl = checkRateLimit(`start:${id}`, { maxRequests: 10, windowMs: 60_000 });
     if (!rl.allowed) return rateLimitResponse(rl);
 
-    const session = await prisma.session.findUnique({
-      where: { id },
-      select: { id: true, status: true },
-    });
-    if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
-    }
-    if (session.status === "ABANDONED") {
-      return NextResponse.json(
-        { error: "This interview was abandoned and cannot be restarted" },
-        { status: 400 },
-      );
-    }
-
     try {
+      const session = await prisma.session.findUnique({
+        where: { id },
+        select: { id: true, status: true },
+      });
+      if (!session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+      if (session.status === "ABANDONED") {
+        return NextResponse.json(
+          { error: "This interview was abandoned and cannot be restarted" },
+          { status: 400 },
+        );
+      }
+
       const orchestrator = getOrCreateOrchestrator(id);
       const outcome = await orchestrator.startInterview();
       return NextResponse.json({
@@ -44,24 +44,31 @@ export async function POST(
     } catch (error) {
       console.error("Interview start failed:", error);
 
-      if (error instanceof OrchestratorError) {
-        return NextResponse.json(
-          { error: error.message, code: error.code, retryable: true },
-          { status: error.httpStatus },
-        );
-      }
-
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("429")) {
-        return NextResponse.json(
-          { error: "Rate limited — please try again in a moment", retryable: true },
-          { status: 429 },
-        );
+      const status = error instanceof OrchestratorError
+        ? error.httpStatus
+        : error instanceof Error && "status" in error && error.status === 429 ? 429 : 500;
+      const messages: string[] = [];
+      const seen = new Set<unknown>();
+      let cause: unknown = error;
+      while (cause != null && !seen.has(cause)) {
+        seen.add(cause);
+        if (!(cause instanceof Error)) {
+          if (typeof cause === "string") messages.push(cause);
+          break;
+        }
+        messages.push(cause.message || cause.name);
+        cause = cause.cause;
       }
 
       return NextResponse.json(
-        { error: "Failed to start interview", retryable: true },
-        { status: 500 },
+        {
+          error: messages.join("\nCaused by: ") || "Failed to start interview",
+          code: error instanceof Error && "code" in error && typeof error.code === "string"
+            ? error.code : "START_FAILED",
+          ...(process.env.NODE_ENV === "development" && error instanceof Error && { stack: error.stack }),
+          retryable: true,
+        },
+        { status },
       );
     }
   });

@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, Check, GraduationCap, Layers, MicOff, Pause, Play, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, GraduationCap, Layers, MicOff, Pause, Play, RefreshCw, Square } from "lucide-react";
 import { useInterviewStream } from "@/hooks/useInterviewStream";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { useWebcam } from "@/hooks/useWebcam";
 import { useAvatarStream } from "@/hooks/useAvatarStream";
 import { useCoach } from "@/hooks/useCoach";
+import { getClientId } from "@/lib/client-id";
 import { getMockMode } from "@/lib/mock-mode";
 import { InterviewHeader } from "@/components/interview/interview-header";
 import { QuestionCard } from "@/components/interview/question-card";
@@ -96,6 +97,7 @@ export default function InterviewPage() {
   } | null>(null);
   const [paused, setPaused] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [startStack, setStartStack] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -124,10 +126,12 @@ export default function InterviewPage() {
       lastActionRef.current = "start";
       setIsStarting(true);
       setStartError(null);
+      setStartStack(null);
       try {
         const res = await fetch(`/api/interview/${id}/start`, { method: "POST" });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
+          setStartStack(typeof data?.stack === "string" ? data.stack : null);
           throw new Error(
             typeof data?.error === "string"
               ? data.error
@@ -189,11 +193,14 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVideoMode]);
 
-  // Connect avatar stream when data arrives via SSE
+  // Connect (or reconnect) the avatar whenever the server hands us a new offer.
+  // Each `avatar_stream_ready` carries a fresh single-use stream id.
+  const connectedStreamIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (interview.avatarStreamData && !avatarStream.isConnected && !avatarStream.error) {
-      avatarStream.connect(interview.avatarStreamData);
-    }
+    const data = interview.avatarStreamData;
+    if (!data || connectedStreamIdRef.current === data.streamId) return;
+    connectedStreamIdRef.current = data.streamId;
+    avatarStream.connect(data);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.avatarStreamData]);
 
@@ -213,24 +220,9 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.avatarFailed]);
 
-  // Queue question audio when ready. It plays after anything already queued
-  // (e.g. a stage-transition narration), and the phase flips to "speaking"
-  // only when this clip actually starts.
-  useEffect(() => {
-    if (!interview.audioUrl || phase === "recording") return;
-    const questionText = interview.currentQuestion?.text;
-    playback
-      .enqueue(interview.audioUrl, {
-        mockText: questionText,
-        onStart: () => setPhase("speaking"),
-      })
-      .then(() => setPhase("ready_to_record"))
-      .catch(() => {
-        // Audio play failed (possibly autoplay blocked) — go straight to recording
-        setPhase("ready_to_record");
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interview.audioUrl]);
+  const questionId = interview.currentQuestion?.questionId;
+  const pendingNarration = useRef<string | null>(null);
+  const questionNarration = useRef<string | null>(null);
 
   // Sync avatar speaking state with audio playback ending
   useEffect(() => {
@@ -248,26 +240,43 @@ export default function InterviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.transitionMessage]);
 
-  // Handle stage transition (Full Loop mode): narration first, then the next
-  // question's audio (queued by the effect above when `audio_ready` arrives).
+  // Include the stage narration when the candidate chooses to play its first question.
   useEffect(() => {
     if (interview.stageTransition && interview.stageTransition.completedStage) {
       setPhase("stage_transition");
-      if (interview.stageTransition.transitionAudioUrl) {
-        playback.enqueue(interview.stageTransition.transitionAudioUrl).catch(() => {
-          // Narration failed — the question audio still plays next
-        });
-      }
+      pendingNarration.current = interview.stageTransition.transitionAudioUrl || null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interview.stageTransition]);
+
+  // A written question is immediately answerable, even while TTS is pending.
+  useEffect(() => {
+    if (!questionId) return;
+    questionNarration.current = pendingNarration.current;
+    pendingNarration.current = null;
+    setPhase("ready_to_record");
+  }, [questionId]);
+
+  const playQuestion = () => {
+    if (paused || phase !== "ready_to_record" || !interview.audioUrl) return;
+    setPhase("speaking");
+    // Video mode: make the avatar lip-sync the same line as the audio starts.
+    if (isVideoMode && avatarStream.isConnected) {
+      void fetch(`/api/interview/${id}/avatar-speak`, { method: "POST" }).catch(() => {});
+    }
+    if (questionNarration.current) {
+      void playback.enqueue(questionNarration.current).catch(() => {});
+      questionNarration.current = null;
+    }
+    void playback.play(interview.audioUrl, interview.currentQuestion?.text)
+      .catch(() => {})
+      .finally(() => setPhase((current) => current === "speaking" ? "ready_to_record" : current));
+  };
 
   // Server-side errors: audio failures still let the user answer the written
   // question; a failure during processing lets them record again.
   useEffect(() => {
     if (!interview.error) return;
     if (interview.error.code === "AUDIO_UNAVAILABLE") {
-      if (phase !== "recording") setPhase("ready_to_record");
       return;
     }
     if (phase === "processing") {
@@ -291,6 +300,7 @@ export default function InterviewPage() {
   }, [interview.isComplete, interview.redirectTo, router]);
 
   const handleStartRecording = useCallback(async () => {
+    if (paused || phase !== "ready_to_record" || !questionId) return;
     setRecordError(null);
     setSubmitError(null);
     try {
@@ -298,6 +308,7 @@ export default function InterviewPage() {
       await recorder.startRecording();
       setPhase("recording");
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setPhase("ready_to_record");
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         // permissionState becomes "denied"; the mic alert covers it
@@ -312,7 +323,7 @@ export default function InterviewPage() {
             });
       setRecordError(message);
     }
-  }, [recorder]);
+  }, [recorder, paused, phase, questionId]);
 
   const submitBlob = useCallback(
     async (blob: Blob) => {
@@ -343,6 +354,7 @@ export default function InterviewPage() {
   );
 
   const handleStopRecording = useCallback(async () => {
+    setPhase("processing");
     let blob: Blob;
     try {
       blob = await recorder.stopRecording();
@@ -447,12 +459,50 @@ export default function InterviewPage() {
     [coach, interview.currentQuestion?.questionId],
   );
 
+  const [stopping, setStopping] = useState(false);
+  const [stopError, setStopError] = useState<string | null>(null);
+  const stoppingRef = useRef(false);
+  const stopInterview = async () => {
+    if (stoppingRef.current || phase === "complete" || !window.confirm(t.interview.stop.confirm)) return;
+    stoppingRef.current = true;
+    setStopping(true);
+    setStopError(null);
+    recorder.cancelRecording();
+    playback.stop();
+    webcam.stop();
+    coach.cancel();
+    try {
+      const response = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ABANDONED", clientId: getClientId() }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || t.interview.stop.failed);
+      }
+      avatarStream.disconnect();
+      router.replace("/history");
+    } catch (error) {
+      stoppingRef.current = false;
+      setStopping(false);
+      setStopError(error instanceof Error ? error.message : t.interview.stop.failed);
+      setPhase((current) => ["starting_recording", "recording", "speaking"].includes(current) ? "ready_to_record" : current);
+    }
+  };
+
   // Keyboard shortcuts: Space toggles recording, R replays the question,
-  // P pauses / resumes, Escape closes the coach.
+  // P pauses / resumes, Escape stops the interview.
   // Ignored while typing in a field and while an answer is being processed.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        void stopInterview();
+        return;
+      }
+      if (stoppingRef.current) return;
       const target = event.target as HTMLElement | null;
       if (
         target &&
@@ -461,12 +511,6 @@ export default function InterviewPage() {
           target.tagName === "SELECT" ||
           target.isContentEditable)
       ) {
-        return;
-      }
-
-      if (event.key === "Escape" && coachOpen) {
-        event.preventDefault();
-        setCoachOpen(false);
         return;
       }
 
@@ -481,6 +525,7 @@ export default function InterviewPage() {
       if (paused) return;
 
       if (event.code === "Space") {
+        if (target?.closest("button, a, [role=button]")) return;
         if (phase === "ready_to_record") {
           event.preventDefault();
           void handleStartRecording();
@@ -492,23 +537,15 @@ export default function InterviewPage() {
       }
 
       if (event.key === "r" || event.key === "R") {
-        if (!interview.audioUrl) return;
-        if (phase !== "ready_to_record" && phase !== "speaking") return;
         event.preventDefault();
-        playback
-          .enqueue(interview.audioUrl, {
-            mockText: interview.currentQuestion?.text,
-            onStart: () => setPhase("speaking"),
-          })
-          .then(() => setPhase("ready_to_record"))
-          .catch(() => setPhase("ready_to_record"));
+        playQuestion();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, paused, canPause, coachOpen, togglePause, interview.audioUrl, interview.currentQuestion?.text, handleStartRecording, handleStopRecording]);
+  }, [stopInterview, phase, paused, canPause, coachOpen, togglePause, interview.audioUrl, interview.currentQuestion?.text, handleStartRecording, handleStopRecording]);
 
   // Derive avatar phase from interview phase
   const avatarPhase = (() => {
@@ -567,12 +604,19 @@ export default function InterviewPage() {
         </Alert>
       )}
 
+      {stopError && <p className="tile bg-blush p-3 text-sm" role="alert">{stopError}</p>}
       {startError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>{t.interview.alerts.start.title}</AlertTitle>
           <AlertDescription className="space-y-3">
-            <p>{startError}</p>
+            <p className="whitespace-pre-wrap break-words">{startError}</p>
+            {startStack && (
+              <details>
+                <summary className="cursor-pointer">{t.interview.errors.stackTrace}</summary>
+                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all text-xs">{startStack}</pre>
+              </details>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
@@ -653,12 +697,22 @@ export default function InterviewPage() {
     </>
   );
 
+  const stopButton = (
+    <Button size="sm" variant="destructive" onClick={stopInterview} aria-keyshortcuts="Escape">
+      <Square className="h-3.5 w-3.5" /> {t.interview.stop.button}
+      <span className="kbd hidden sm:inline">Esc</span>
+    </Button>
+  );
+
+  if (stopping) return <p className="container py-8" role="status">{t.interview.stop.stopping}</p>;
+
   // Loading state
   if (phase === "loading" && !interview.currentQuestion) {
     return (
       <div className="container max-w-3xl py-8 sm:py-12">
         <div className="space-y-5">
           {errorAlerts}
+          {stopButton}
           {/* Header strip placeholder */}
           <div className="tile flex items-center gap-4 px-5 py-4">
             <Skeleton className="h-9 w-9 rounded-md" />
@@ -724,63 +778,69 @@ export default function InterviewPage() {
     );
   }
 
+  // Header: company · role | step rail | timer · connection. Full-width above the
+  // split in video mode, first item of the column in audio mode.
+  const headerBar = (
+    <InterviewHeader
+      companyName={sessionMeta?.companyName || t.interview.header.fallbackCompany}
+      jobTitle={sessionMeta?.jobTitle || ""}
+      difficulty={sessionMeta?.difficulty || "MID"}
+      questionOrder={interview.currentQuestion?.order || 0}
+      questionTotal={interview.currentQuestion?.total || 0}
+      isRecording={phase === "recording"}
+      paused={paused}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          {stopButton}
+          {coachEnabled && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => (coachOpen ? setCoachOpen(false) : openCoach())}
+              disabled={!paused && !canPause}
+              aria-pressed={coachOpen}
+              className={coachOpen ? "bg-lavender text-lavender-deep" : undefined}
+              title={t.interview.coach.open}
+            >
+              <GraduationCap className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">{t.interview.coach.open}</span>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant={paused ? "accent" : "outline"}
+            onClick={togglePause}
+            disabled={!paused && !canPause}
+            aria-pressed={paused}
+            title={paused ? t.interview.pause.resume : t.interview.pause.button}
+          >
+            {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            <span className="hidden md:inline">
+              {paused ? t.interview.pause.resume : t.interview.pause.button}
+            </span>
+          </Button>
+        </div>
+      }
+      progress={
+        <ProgressBar
+          current={interview.currentQuestion?.order || 0}
+          total={interview.currentQuestion?.total || 0}
+          isFollowUp={isFollowUp}
+        />
+      }
+      status={
+        <ConnectionStatus
+          status={interview.connectionStatus}
+          onReconnect={interview.reconnect}
+        />
+      }
+    />
+  );
+
   // Shared interview controls (used in both layouts)
   const interviewControls = (
     <>
-      {/* Header: company · role | step rail | timer · connection */}
-      <InterviewHeader
-        companyName={sessionMeta?.companyName || t.interview.header.fallbackCompany}
-        jobTitle={sessionMeta?.jobTitle || ""}
-        difficulty={sessionMeta?.difficulty || "MID"}
-        questionOrder={interview.currentQuestion?.order || 0}
-        questionTotal={interview.currentQuestion?.total || 0}
-        isRecording={phase === "recording"}
-        paused={paused}
-        actions={
-          <div className="flex items-center gap-2">
-            {coachEnabled && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => (coachOpen ? setCoachOpen(false) : openCoach())}
-                disabled={!paused && !canPause}
-                aria-pressed={coachOpen}
-                className={coachOpen ? "bg-lavender text-lavender-deep" : undefined}
-                title={t.interview.coach.open}
-              >
-                <GraduationCap className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">{t.interview.coach.open}</span>
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant={paused ? "accent" : "outline"}
-              onClick={togglePause}
-              disabled={!paused && !canPause}
-              aria-pressed={paused}
-              title={paused ? t.interview.pause.resume : t.interview.pause.button}
-            >
-              {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              <span className="hidden md:inline">
-                {paused ? t.interview.pause.resume : t.interview.pause.button}
-              </span>
-            </Button>
-          </div>
-        }
-        progress={
-          <ProgressBar
-            current={interview.currentQuestion?.order || 0}
-            total={interview.currentQuestion?.total || 0}
-            isFollowUp={isFollowUp}
-          />
-        }
-        status={
-          <ConnectionStatus
-            status={interview.connectionStatus}
-            onReconnect={interview.reconnect}
-          />
-        }
-      />
+      {!isVideoMode && headerBar}
 
       {/* Errors */}
       {errorAlerts}
@@ -825,6 +885,12 @@ export default function InterviewPage() {
             isFollowUp={isFollowUp}
           />
         </div>
+      )}
+
+      {interview.currentQuestion && interview.audioUrl && (phase === "ready_to_record" || phase === "speaking") && (
+        <Button variant="outline" size="sm" disabled={paused} onClick={phase === "speaking" ? playback.stop : playQuestion}>
+          {phase === "speaking" ? t.interview.record.stopAudio : t.interview.record.play}
+        </Button>
       )}
 
       {/* Audio waveform (hidden in video mode — avatar replaces it) */}
@@ -874,54 +940,50 @@ export default function InterviewPage() {
       )}
 
       {coachEnabled && (
-        <>
-          <SelectionPopover
-            enabled={canPause || paused}
-            onExplain={handleExplain}
-          />
-          <CoachDrawer
-            open={coachOpen}
-            onClose={() => setCoachOpen(false)}
-            notes={coach.notes}
-            currentQuestionId={interview.currentQuestion?.questionId ?? null}
-            draft={coach.draft}
-            isStreaming={coach.isStreaming}
-            error={coach.error}
-            onAsk={handleAskCoach}
-            onCancel={coach.cancel}
-            modelLabel={isMock ? "mock" : (coach.model ?? "…")}
-          />
-        </>
+        <SelectionPopover enabled={canPause || paused} onExplain={handleExplain} />
       )}
     </>
   );
 
-  // Video mode layout
-  if (isVideoMode) {
-    return (
-      <VideoLayout
-        remoteStream={avatarStream.remoteStream}
-        isStreamConnected={avatarStream.isConnected}
-        isPlaying={playback.isPlaying}
-        avatarPhase={avatarPhase}
-        isMockMode={isMock}
-        webcamStream={webcam.stream}
-        webcamActive={webcam.isActive}
-        onWebcamToggle={handleWebcamToggle}
-      >
-        {interviewControls}
-      </VideoLayout>
-    );
-  }
-
-  // Audio-only layout (shifts left while the coach drawer is open on desktop)
   return (
-    <div
-      className={`container max-w-3xl py-6 transition-[padding] duration-300 ease-pop sm:py-8 ${coachOpen ? "sm:pr-[27rem] xl:pr-0 xl:-translate-x-[13rem]" : ""}`}
-    >
-      <div className="space-y-5">
-        {interviewControls}
+    <div className={coachEnabled && coachOpen
+      ? "mx-auto grid max-w-[100rem] items-start gap-5 px-4 py-6 md:grid-cols-[minmax(0,1fr)_minmax(18rem,30%)]"
+      : "mx-auto py-6 sm:py-8"}>
+      <div className="min-w-0">
+        {isVideoMode ? (
+          <VideoLayout
+            remoteStream={avatarStream.remoteStream}
+            isStreamConnected={avatarStream.isConnected}
+            hasFrames={avatarStream.hasFrames}
+            presenterUrl={interview.avatarStreamData?.presenterUrl ?? null}
+            isPlaying={playback.isPlaying}
+            avatarPhase={avatarPhase}
+            isMockMode={isMock}
+            webcamStream={webcam.stream}
+            webcamActive={webcam.isActive}
+            onWebcamToggle={handleWebcamToggle}
+            header={headerBar}
+          >
+            {interviewControls}
+          </VideoLayout>
+        ) : (
+          <div className="container max-w-3xl space-y-5">{interviewControls}</div>
+        )}
       </div>
+      {coachEnabled && (
+        <CoachDrawer
+          open={coachOpen}
+          onClose={() => setCoachOpen(false)}
+          notes={coach.notes}
+          currentQuestionId={interview.currentQuestion?.questionId ?? null}
+          draft={coach.draft}
+          isStreaming={coach.isStreaming}
+          error={coach.error}
+          onAsk={handleAskCoach}
+          onCancel={coach.cancel}
+          modelLabel={isMock ? "mock" : (coach.model ?? "…")}
+        />
+      )}
     </div>
   );
 }

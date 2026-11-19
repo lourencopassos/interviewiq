@@ -16,12 +16,19 @@ export function useWebcam() {
   });
   const streamRef = useRef<MediaStream | null>(null);
 
+  const captureGeneration = useRef(0);
+
   const start = useCallback(async () => {
+    const generation = ++captureGeneration.current;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false, // Audio handled by useAudioRecorder
       });
+      if (generation !== captureGeneration.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       setState({ stream, isActive: true, error: null });
     } catch (error) {
@@ -34,6 +41,7 @@ export function useWebcam() {
   }, []);
 
   const stop = useCallback(() => {
+    captureGeneration.current++;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -42,11 +50,7 @@ export function useWebcam() {
   }, []);
 
   // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
+  useEffect(() => stop, [stop]);
 
   return { ...state, start, stop };
 }

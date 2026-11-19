@@ -47,7 +47,9 @@ export const interview: typeof En = {
     idle: "Espera un momento…",
     recording: "Grabando",
     start: "Grabar respuesta",
-    stop: "Detener grabación",
+    stop: "Terminar respuesta y continuar",
+    play: "Escuchar pregunta",
+    stopAudio: "Detener audio",
   },
   waveform: {
     listening: "escuchando",
@@ -113,6 +115,7 @@ export const interview: typeof En = {
   },
   errors: {
     network: "Error de red — revisa tu conexión",
+    stackTrace: "Traza de la pila",
     startFailed: "No se pudo iniciar la entrevista",
     startFailedStatus: "No se pudo iniciar la entrevista ({status})",
     submitFailed: "No se pudo enviar tu respuesta",
@@ -127,6 +130,12 @@ export const interview: typeof En = {
     NO_QUESTION: "No se encontró una pregunta actual.",
     REPORT_FAILED:
       "No pudimos generar tu informe. Tus respuestas están guardadas — puedes reintentar desde la página del informe.",
+  },
+  stop: {
+    button: "Terminar entrevista",
+    confirm: "¿Terminar la entrevista? Se descartará la grabación en curso y no podrás reanudar esta sesión.",
+    stopping: "Terminando la entrevista…",
+    failed: "No se pudo terminar la entrevista. Inténtalo de nuevo.",
   },
   pause: {
     eyebrow: "respira",

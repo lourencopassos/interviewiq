@@ -122,7 +122,7 @@ export function CoachDrawer({
   }, [open, draft?.text, notes.length]);
 
   useEffect(() => {
-    if (open && !isStreaming) inputRef.current?.focus();
+    if (open && !isStreaming) inputRef.current?.focus({ preventScroll: true });
   }, [open, isStreaming]);
 
   const submit = (e: FormEvent) => {
@@ -133,17 +133,10 @@ export function CoachDrawer({
     setPrompt("");
   };
 
+  if (!open) return null;
   return (
-    <aside
-      aria-label={C.title}
-      inert={!open}
-      aria-hidden={!open}
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh] flex-col transition-transform duration-300 ease-pop sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[26rem] sm:p-3",
-        open ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-[110%] sm:translate-y-0",
-      )}
-    >
-      <div className="tile flex h-full flex-col overflow-hidden rounded-b-none sm:rounded-b-tile">
+    <aside aria-label={C.title} className="min-w-0 md:sticky md:top-4">
+      <div className="tile flex h-[min(70dvh,38rem)] flex-col overflow-hidden md:h-[calc(100dvh-2rem)]">
         {/* Title strip */}
         <div className="flex items-center justify-between gap-3 border-b-1.5 border-ink bg-lavender px-4 py-2.5 text-lavender-deep">
           <div className="flex items-center gap-2">

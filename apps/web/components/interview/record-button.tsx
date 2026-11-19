@@ -95,10 +95,11 @@ export function RecordButton({
             "transition-[transform,box-shadow,background-color,color] duration-150 ease-pop",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
             tileByPhase[phase],
+            isRecording && "h-12 min-h-12 w-auto gap-2 rounded-md px-5",
           )}
         >
           {isRecording ? (
-            <Square className="h-7 w-7" fill="currentColor" />
+            <><Square className="h-4 w-4" fill="currentColor" />{t.interview.record.stop}</>
           ) : phase === "processing" ? (
             <Loader2 className="h-7 w-7 animate-spin" />
           ) : phase === "speaking" ? (

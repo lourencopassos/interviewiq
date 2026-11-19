@@ -82,6 +82,7 @@ export function useAudioRecorder() {
   }, []);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const captureGeneration = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -141,6 +142,7 @@ export function useAudioRecorder() {
       return;
     }
 
+    const generation = ++captureGeneration.current;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -150,6 +152,11 @@ export function useAudioRecorder() {
       }
       console.error("Failed to access microphone:", error);
       throw error;
+    }
+
+    if (generation !== captureGeneration.current) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new DOMException("Recording canceled", "AbortError");
     }
 
     try {
@@ -254,6 +261,7 @@ export function useAudioRecorder() {
 
   /** Abort the current recording and discard whatever was captured. */
   const cancelRecording = useCallback(() => {
+    captureGeneration.current++;
     const mediaRecorder = mediaRecorderRef.current;
     mediaRecorderRef.current = null;
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -276,23 +284,7 @@ export function useAudioRecorder() {
   }, [releaseResources]);
 
   // Stop any in-progress recording and release the mic on unmount
-  useEffect(() => {
-    return () => {
-      const mediaRecorder = mediaRecorderRef.current;
-      mediaRecorderRef.current = null;
-      if (mediaRecorder && mediaRecorder.state !== "inactive") {
-        mediaRecorder.onstop = null;
-        mediaRecorder.ondataavailable = null;
-        try {
-          mediaRecorder.stop();
-        } catch {
-          // Already stopped
-        }
-      }
-      chunksRef.current = [];
-      releaseResources();
-    };
-  }, [releaseResources]);
+  useEffect(() => cancelRecording, [cancelRecording]);
 
   return {
     ...state,

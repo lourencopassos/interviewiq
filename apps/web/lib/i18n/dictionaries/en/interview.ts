@@ -47,7 +47,9 @@ export const interview = {
     idle: "Please wait…",
     recording: "Recording",
     start: "Record answer",
-    stop: "Stop recording",
+    stop: "Finish answer and continue",
+    play: "Play question",
+    stopAudio: "Stop playback",
   },
   waveform: {
     listening: "listening",
@@ -114,6 +116,7 @@ export const interview = {
   /** Client-side failure copy. */
   errors: {
     network: "Network error — please check your connection",
+    stackTrace: "Stack trace",
     startFailed: "Failed to start interview",
     startFailedStatus: "Failed to start interview ({status})",
     submitFailed: "Failed to submit your answer",
@@ -129,6 +132,12 @@ export const interview = {
     NO_QUESTION: "No current question found.",
     REPORT_FAILED:
       "We couldn't generate your report. Your answers are saved — you can retry from the report page.",
+  },
+  stop: {
+    button: "Stop interview",
+    confirm: "Stop this interview? Any recording in progress will be discarded. This session cannot be resumed.",
+    stopping: "Stopping interview…",
+    failed: "Could not stop the interview. Please try again.",
   },
   pause: {
     eyebrow: "take a breath",
