@@ -9,13 +9,8 @@ export const report = {
     check: "check {n}/{total}",
   },
   fetchErrors: {
-    network: "Network error — could not load the report",
     timeout: "The report is taking longer than expected. You can try generating it again.",
     failed: "Report generation failed.",
-    loadStatus: "Failed to load report ({status})",
-    regenerateStatus: "Regeneration failed ({status})",
-    regenerateNetwork: "Network error — please try again",
-    regenerateFailed: "Regeneration failed",
   },
   notFound: {
     eyebrow: "[ 404 ] session not found",
@@ -106,12 +101,6 @@ export const report = {
     interviewerNotes: "interviewer's notes",
     strengths: "strengths",
     gaps: "gaps",
-    category: {
-      technical: "technical",
-      behavioral: "behavioral",
-      system_design: "system design",
-      culture_fit: "culture fit",
-    },
   },
   coach: {
     /** Pill next to a question the candidate asked the coach about before answering. */

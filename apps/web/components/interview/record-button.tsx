@@ -3,6 +3,7 @@
 import { Mic, Square, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { formatDuration } from "@/lib/format";
 
 /**
  * What the interview is doing right now, from the recorder's point of view.
@@ -53,9 +54,7 @@ export function RecordButton({
   const isRecording = phase === "recording";
   const isDisabled = phase !== "ready" && phase !== "recording";
 
-  const minutes = Math.floor(duration / 60);
-  const seconds = duration % 60;
-  const timeStr = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  const timeStr = formatDuration(duration);
 
   // Ring scale based on audio level during recording
   const ringScale = isRecording ? 1 + audioLevel * 0.3 : 1;

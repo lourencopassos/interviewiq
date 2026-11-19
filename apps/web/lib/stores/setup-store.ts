@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { draftKey, saveJob } from "@/lib/saved-jobs";
 import { getClientId } from "@/lib/client-id";
+import { apiFetch } from "@/lib/api-client";
+import { toUiError, type UiError } from "@/lib/errors";
 import type {
   ParsedJob,
   CompanyIntelligence,
@@ -10,18 +12,6 @@ import type {
 } from "@interviewiq/types";
 
 type SetupStep = "input" | "parsing" | "researching" | "ready" | "error";
-
-/**
- * Error codes the store emits for its own failure modes. Server-provided
- * messages are passed through unchanged; the rendering component maps
- * these codes to localized copy and shows anything else verbatim.
- */
-export const SETUP_ERROR_CODES = {
-  network: "NETWORK_ERROR",
-  parseFailed: "PARSE_FAILED",
-  unknown: "UNKNOWN_ERROR",
-} as const;
-export type SetupErrorCode = (typeof SETUP_ERROR_CODES)[keyof typeof SETUP_ERROR_CODES];
 
 interface SetupStore {
   // Input state
@@ -39,7 +29,8 @@ interface SetupStore {
   step: SetupStep;
   parsedJob: ParsedJob | null;
   companyIntel: CompanyIntelligence | null;
-  error: string | null;
+  /** Why analysis failed; rendered with describeError. */
+  error: UiError | null;
 
   // Actions
   setJobDescription: (text: string) => void;
@@ -69,7 +60,7 @@ const initialState = {
   restored: false,
   parsedJob: null,
   companyIntel: null,
-  error: null,
+  error: null as UiError | null,
 };
 
 export const useSetupStore = create<SetupStore>((set, get) => ({
@@ -101,33 +92,22 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       // Step 1: Parse job description
       set({ step: "parsing", restored: false, error: null });
 
-      const parseRes = await fetch("/api/parse-job", {
+      const parsedJob = await apiFetch<ParsedJob>("/api/parse-job", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobDescription, clientId: getClientId() }),
+        json: { jobDescription, clientId: getClientId() },
       });
-
-      if (!parseRes.ok) {
-        const err = await parseRes.json();
-        throw new Error(err.error || SETUP_ERROR_CODES.parseFailed);
-      }
-
-      const parsedJob: ParsedJob = await parseRes.json();
       set({ parsedJob, step: "researching" });
 
-      // Step 2: Research company
-      const researchRes = await fetch("/api/research-company", {
+      // Step 2: Research company. Optional: the interview works without it.
+      const companyIntel = await apiFetch<CompanyIntelligence>("/api/research-company", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           companyName: parsedJob.companyName,
           jobTitle: parsedJob.jobTitle,
           primarySkills: parsedJob.primarySkills,
           clientId: getClientId(),
-        }),
-      });
-
-      const companyIntel: CompanyIntelligence | null = researchRes.ok ? await researchRes.json() : null;
+        },
+      }).catch(() => null);
       let storageError = false;
       try {
         saveJob({ jobDescription, parsedJob, companyIntel });
@@ -136,13 +116,7 @@ export const useSetupStore = create<SetupStore>((set, get) => ({
       }
       set({ companyIntel, step: "ready", storageError });
     } catch (error) {
-      const message =
-        error instanceof TypeError
-          ? SETUP_ERROR_CODES.network
-          : error instanceof Error
-            ? error.message
-            : SETUP_ERROR_CODES.unknown;
-      set({ step: "error", error: message });
+      set({ step: "error", error: toUiError(error) });
     }
   },
 

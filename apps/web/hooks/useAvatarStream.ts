@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { clientHeaders } from "@/lib/client-id";
+import type { InterviewEventOf } from "@interviewiq/types";
+import { apiRequest } from "@/lib/api-client";
 
 interface AvatarStreamState {
   /** Remote video MediaStream from D-ID (avatar) */
@@ -10,15 +11,12 @@ interface AvatarStreamState {
   isConnected: boolean;
   /** D-ID only sends video frames while the avatar talks; false between talks. */
   hasFrames: boolean;
-  /** Error message if connection failed */
+  /** Why the avatar is unavailable (a failure code or WebRTC state, for logs); null while healthy. */
   error: string | null;
 }
 
-interface AvatarStreamData {
-  streamId: string;
-  sdpOffer: RTCSessionDescriptionInit;
-  iceServers: RTCIceServer[];
-}
+/** The offer from an `avatar_stream_ready` SSE event. */
+type AvatarStreamData = Pick<InterviewEventOf<"avatar_stream_ready">["data"], "streamId" | "sdpOffer" | "iceServers">;
 
 /** How long a `disconnected` peer connection may try to recover before we give up. */
 const DISCONNECT_GRACE_MS = 5000;
@@ -118,10 +116,9 @@ export function useAvatarStream(sessionId: string) {
         pc.onicecandidate = async (event) => {
           if (event.candidate) {
             try {
-              await fetch(`/api/interview/${sessionId}/avatar-ice`, {
+              await apiRequest(`/api/interview/${sessionId}/avatar-ice`, {
                 method: "POST",
-                headers: clientHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ candidate: event.candidate }),
+                json: { candidate: event.candidate },
               });
             } catch {
               console.warn("ICE candidate relay failed");
@@ -178,21 +175,17 @@ export function useAvatarStream(sessionId: string) {
         };
 
         // Set remote description (D-ID's offer)
-        await pc.setRemoteDescription(data.sdpOffer);
+        await pc.setRemoteDescription(data.sdpOffer as RTCSessionDescriptionInit);
 
         // Create and set local answer
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
         // Send SDP answer to server → D-ID
-        const res = await fetch(`/api/interview/${sessionId}/avatar-sdp`, {
+        await apiRequest(`/api/interview/${sessionId}/avatar-sdp`, {
           method: "POST",
-          headers: clientHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({ sdpAnswer: answer }),
+          json: { sdpAnswer: answer },
         });
-        if (!res.ok) {
-          throw new Error(`Failed to deliver SDP answer (${res.status})`);
-        }
       } catch (error) {
         console.error("[Avatar] WebRTC setup failed:", error);
         setState((prev) => ({
@@ -204,9 +197,7 @@ export function useAvatarStream(sessionId: string) {
     [sessionId, clearDisconnectTimer],
   );
 
-  /**
-   * Called when `avatar_stream_failed` event arrives.
-   */
+  /** Called when an `avatar_stream_failed` event arrives, with its code. */
   const onStreamFailed = useCallback((reason: string) => {
     setState((prev) => ({
       ...prev,

@@ -1,38 +1,16 @@
 "use client";
 
 import { Layers } from "lucide-react";
+import type { InterviewStage } from "@interviewiq/types";
 import { cn } from "@/lib/utils";
-import { useI18n, type Dictionary } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
+import { scoreTone, toneStyles } from "@/lib/score";
 
 interface StageTransitionCardProps {
-  completedStage: string;
+  /** Null for the opening stage intro (nothing finished yet). */
+  completedStage: InterviewStage | null;
   stageScore: number;
-  nextStage: string;
-}
-
-type StageKey = keyof Dictionary["interview"]["stages"];
-
-/**
- * The server emits Full Loop stage names as the English labels from
- * `FULL_LOOP_STAGES` (packages/types). Map them back to the enum so the UI can
- * show them in the interface language; unknown labels pass through unchanged.
- */
-const stageKeyByLabel: Record<string, StageKey> = {
-  "Phone Screen": "PHONE_SCREEN",
-  "Technical Deep Dive": "TECHNICAL",
-  Behavioral: "BEHAVIORAL",
-  "System Design": "SYSTEM_DESIGN",
-};
-
-export function localizeStage(label: string, t: Dictionary): string {
-  const key = stageKeyByLabel[label] ?? (label as StageKey);
-  return t.interview.stages[key] ?? label;
-}
-
-function scoreTone(score: number): string {
-  if (score >= 75) return "bg-sage text-sage-deep";
-  if (score >= 55) return "bg-butter text-butter-deep";
-  return "bg-blush text-blush-deep";
+  nextStage: InterviewStage;
 }
 
 /** Full Loop mode: a lavender tile announcing the finished stage and the next one. */
@@ -50,13 +28,13 @@ export function StageTransitionCard({
           <div className="min-w-0 flex-1">
             <p className="eyebrow text-lavender-deep">{t.interview.stageTransition.complete}</p>
             <p className="mt-1 truncate text-[17px] font-extrabold tracking-tight text-lavender-deep">
-              {localizeStage(completedStage, t)}
+              {t.interview.stages[completedStage]}
             </p>
           </div>
           <div
             className={cn(
               "flex shrink-0 items-baseline gap-1 rounded-md border-1.5 border-ink px-3 py-1.5 shadow-pop-sm",
-              scoreTone(stageScore),
+              toneStyles[scoreTone(stageScore)].tile,
             )}
           >
             <span className="text-3xl font-extrabold leading-none tabular-nums">{stageScore}</span>
@@ -73,7 +51,7 @@ export function StageTransitionCard({
 
       <div className="flex items-center justify-center gap-2 text-[15px] font-extrabold tracking-tight text-lavender-deep">
         <Layers className="h-4 w-4" />
-        {localizeStage(nextStage, t)}
+        {t.interview.stages[nextStage]}
       </div>
     </section>
   );

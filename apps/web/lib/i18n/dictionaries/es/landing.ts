@@ -27,6 +27,7 @@ export const landing: typeof En = {
     you: "tú",
     followUp: "repregunta",
     listening: "escuchando",
+    recordingAnswer: "Grabando respuesta",
     waiting: "Esperando a que termine la pregunta…",
     transcribed: "Respuesta transcrita · 48s",
     record: "grabar",

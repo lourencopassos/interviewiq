@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Check, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { clientHeaders } from "@/lib/client-id";
+import { apiFetch } from "@/lib/api-client";
+import { describeError, toUiError, type UiError } from "@/lib/errors";
 import { draftKey } from "@/lib/saved-jobs";
 import { interpolate, useI18n } from "@/lib/i18n";
 
@@ -36,7 +37,7 @@ export function DeleteAllData({ onDeleted }: DeleteAllDataProps) {
   const copy = t.history.deleteAll;
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<UiError | null>(null);
   const [deletedCount, setDeletedCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -49,17 +50,12 @@ export function DeleteAllData({ onDeleted }: DeleteAllDataProps) {
     setDeleting(true);
     setError(null);
     try {
-      const res = await fetch("/api/sessions", { method: "DELETE", headers: clientHeaders() });
-      if (!res.ok) {
-        setError(interpolate(copy.failed, { status: res.status }));
-        return;
-      }
-      const data = (await res.json().catch(() => ({}))) as { deleted?: number };
+      const { deleted } = await apiFetch<{ deleted: number }>("/api/sessions", { method: "DELETE" });
       clearLocalData();
-      setDeletedCount(typeof data.deleted === "number" ? data.deleted : 0);
+      setDeletedCount(deleted);
       onDeleted();
-    } catch {
-      setError(copy.network);
+    } catch (err) {
+      setError(toUiError(err));
     } finally {
       setDeleting(false);
       setConfirming(false);
@@ -113,7 +109,7 @@ export function DeleteAllData({ onDeleted }: DeleteAllDataProps) {
       )}
       {error && (
         <p role="alert" className="text-[11px] text-rust">
-          {error}
+          {describeError(t, error)}
         </p>
       )}
     </section>

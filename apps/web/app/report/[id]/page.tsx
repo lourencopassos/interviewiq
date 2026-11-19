@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { CoachingReport, CoachNoteView } from "@interviewiq/types";
 import { interpolate, LOCALE_TAGS, useI18n, type Dictionary } from "@/lib/i18n";
-import { clientHeaders } from "@/lib/client-id";
+import { ApiError, apiRequest } from "@/lib/api-client";
+import { describeError, toUiError, type UiError } from "@/lib/errors";
+import { label } from "@/lib/labels";
 import { VerdictBanner } from "@/components/report/verdict-banner";
 import { DimensionScores } from "@/components/report/dimension-scores";
 import { StrengthsImprovements } from "@/components/report/strengths-improvements";
@@ -49,34 +51,24 @@ interface ReportData {
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 40;
 
-/**
- * Error copy is stored as a descriptor and resolved against the dictionary at
- * render time, so the fetch logic stays locale-agnostic and messages follow a
- * locale switch.
- */
-type ErrorMessage =
-  | { key: "network" | "timeout" | "failed" | "regenerateNetwork" | "regenerateFailed" }
-  | { key: "loadStatus" | "regenerateStatus"; status: number }
-  | { key: "custom"; text: string };
+/** What went wrong: an API/network failure, or polling ran out of attempts. */
+type ReportError = UiError | "timeout";
 
-function resolveError(t: Dictionary, message: ErrorMessage): string {
-  const copy = t.report.fetchErrors;
-  switch (message.key) {
-    case "custom":
-      return message.text;
-    case "loadStatus":
-    case "regenerateStatus":
-      return interpolate(copy[message.key], { status: message.status });
-    default:
-      return copy[message.key];
-  }
+function describeReportError(t: Dictionary, error: ReportError): string {
+  if (error === "timeout") return t.report.fetchErrors.timeout;
+  if (error instanceof ApiError && error.code === "REPORT_FAILED") return t.report.fetchErrors.failed;
+  return describeError(t, error);
 }
+
+/** The session belongs to another browser, or does not exist: both read as "not found". */
+const isNotFound = (error: unknown) =>
+  error instanceof ApiError && (error.code === "SESSION_NOT_FOUND" || error.code === "FORBIDDEN");
 
 type ViewState =
   | { kind: "loading"; attempt: number; sessionStatus: string | null }
   | { kind: "ready"; data: ReportData }
   | { kind: "not_found" }
-  | { kind: "error"; message: ErrorMessage };
+  | { kind: "error"; error: ReportError };
 
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
@@ -88,12 +80,14 @@ export default function ReportPage() {
     sessionStatus: null,
   });
   const [regenerating, setRegenerating] = useState(false);
-  const [regenerateError, setRegenerateError] = useState<ErrorMessage | null>(null);
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [regenerateError, setRegenerateError] = useState<UiError | null>(null);
+  // Bumped to restart polling, e.g. when a regenerate request comes back 202.
+  const [pollRun, setPollRun] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     let attempt = 0;
+    let pollTimeout: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchReport() {
       if (cancelled) return;
@@ -101,59 +95,28 @@ export default function ReportPage() {
 
       let res: Response;
       try {
-        res = await fetch(`/api/sessions/${id}/report`, { headers: clientHeaders() });
-      } catch {
-        if (!cancelled) {
-          setView({ kind: "error", message: { key: "network" } });
-        }
-        return;
-      }
-      if (cancelled) return;
-
-      if (res.status === 200) {
-        const json = (await res.json()) as ReportData;
-        if (!cancelled) setView({ kind: "ready", data: json });
+        res = await apiRequest(`/api/sessions/${id}/report`);
+      } catch (error) {
+        if (cancelled) return;
+        setView(isNotFound(error) ? { kind: "not_found" } : { kind: "error", error: toUiError(error) });
         return;
       }
 
-      // 403: the session belongs to another browser; show it as not found.
-      if (res.status === 404 || res.status === 403) {
-        setView({ kind: "not_found" });
-        return;
-      }
-
+      // 202 `{ status }`: the report is still being generated.
       if (res.status === 202) {
-        const body = (await res.json().catch(() => ({}))) as {
-          status?: string;
-        };
+        const body = (await res.json().catch(() => ({}))) as { status?: string };
         if (cancelled) return;
         if (attempt >= MAX_POLL_ATTEMPTS) {
-          setView({ kind: "error", message: { key: "timeout" } });
+          setView({ kind: "error", error: "timeout" });
           return;
         }
-        setView({
-          kind: "loading",
-          attempt,
-          sessionStatus: body.status ?? null,
-        });
-        pollTimeoutRef.current = setTimeout(fetchReport, POLL_INTERVAL_MS);
+        setView({ kind: "loading", attempt, sessionStatus: body.status ?? null });
+        pollTimeout = setTimeout(fetchReport, POLL_INTERVAL_MS);
         return;
       }
 
-      const body = (await res.json().catch(() => ({}))) as {
-        code?: string;
-        error?: string;
-      };
-      if (cancelled) return;
-      setView({
-        kind: "error",
-        message:
-          body.code === "FAILED"
-            ? { key: "failed" }
-            : typeof body.error === "string"
-              ? { key: "custom", text: body.error }
-              : { key: "loadStatus", status: res.status },
-      });
+      const data = (await res.json()) as ReportData;
+      if (!cancelled) setView({ kind: "ready", data });
     }
 
     setView({ kind: "loading", attempt: 0, sessionStatus: null });
@@ -161,36 +124,22 @@ export default function ReportPage() {
 
     return () => {
       cancelled = true;
-      if (pollTimeoutRef.current) {
-        clearTimeout(pollTimeoutRef.current);
-        pollTimeoutRef.current = null;
-      }
+      if (pollTimeout) clearTimeout(pollTimeout);
     };
-  }, [id]);
+  }, [id, pollRun]);
 
   const handleRegenerate = useCallback(async () => {
     setRegenerating(true);
     setRegenerateError(null);
     try {
-      const res = await fetch(`/api/sessions/${id}/report`, { method: "POST", headers: clientHeaders() });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setRegenerateError(
-          typeof json?.error === "string"
-            ? { key: "custom", text: json.error }
-            : { key: "regenerateStatus", status: res.status },
-        );
+      const res = await apiRequest(`/api/sessions/${id}/report`, { method: "POST" });
+      if (res.status === 202) {
+        setPollRun((n) => n + 1);
         return;
       }
-      setView({ kind: "ready", data: json as ReportData });
+      setView({ kind: "ready", data: (await res.json()) as ReportData });
     } catch (err) {
-      setRegenerateError(
-        err instanceof TypeError
-          ? { key: "regenerateNetwork" }
-          : err instanceof Error
-            ? { key: "custom", text: err.message }
-            : { key: "regenerateFailed" },
-      );
+      setRegenerateError(toUiError(err));
     } finally {
       setRegenerating(false);
     }
@@ -265,13 +214,13 @@ export default function ReportPage() {
       <div className="container max-w-lg py-24">
         <div className="tile-pop bg-blush p-6 text-blush-deep sm:p-8">
           <p className="eyebrow text-current opacity-80">{copy.eyebrow}</p>
-          <h1 className="mt-2 text-2xl text-current">{resolveError(t, view.message)}</h1>
+          <h1 className="mt-2 text-2xl text-current">{describeReportError(t, view.error)}</h1>
           <p className="mt-2 text-[13px] leading-relaxed opacity-90">{copy.body}</p>
 
           {regenerateError && (
             <Alert variant="destructive" className="mt-4 bg-card">
               <AlertTitle>{copy.regenerateFailedTitle}</AlertTitle>
-              <AlertDescription>{resolveError(t, regenerateError)}</AlertDescription>
+              <AlertDescription>{describeError(t, regenerateError)}</AlertDescription>
             </Alert>
           )}
 
@@ -296,16 +245,9 @@ export default function ReportPage() {
   const { report, session, questions } = view.data;
 
   // The title strip reads lowercase by design; the shared labels are sentence case.
-  const difficultyLabel = (
-    (t.common.difficulty as Record<string, string>)[session.difficulty] ?? session.difficulty
-  ).toLocaleLowerCase(localeTag);
-  const typeLabel = (
-    (t.common.interviewType as Record<string, string>)[session.interviewType] ??
-    session.interviewType.replace(/_/g, " ")
-  ).toLocaleLowerCase(localeTag);
-  const languageLabel =
-    (t.common.interviewLanguage as Record<string, string>)[session.language] ??
-    session.language.replace(/_/g, "-");
+  const difficultyLabel = label(t, "difficulty", session.difficulty).toLocaleLowerCase(localeTag);
+  const typeLabel = label(t, "interviewType", session.interviewType).toLocaleLowerCase(localeTag);
+  const languageLabel = label(t, "interviewLanguage", session.language);
 
   return (
     <div className="container max-w-4xl space-y-8 py-10">

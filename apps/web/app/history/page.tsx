@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
-import { clientHeaders } from "@/lib/client-id";
+import { ApiError, apiFetch, apiRequest } from "@/lib/api-client";
 import { interpolate, useI18n } from "@/lib/i18n";
 import { SessionCard } from "@/components/history/session-card";
 import { SessionFilters } from "@/components/history/session-filters";
@@ -33,10 +33,7 @@ export default function HistoryPage() {
   const fetchSessions = useCallback(async () => {
     try {
       // Lists every status, drafts (SETUP) and abandoned sessions included.
-      const res = await fetch("/api/sessions", { headers: clientHeaders() });
-      if (res.ok) {
-        setSessions(await res.json());
-      }
+      setSessions(await apiFetch<SessionItem[]>("/api/sessions"));
     } catch (error) {
       console.error("Failed to fetch sessions:", error);
     } finally {
@@ -48,39 +45,17 @@ export default function HistoryPage() {
     fetchSessions();
   }, [fetchSessions]);
 
-  const deleteErrors = t.history.deleteErrors;
-  const handleDelete = useCallback(
-    async (id: string) => {
-      let res: Response;
-      try {
-        res = await fetch(`/api/sessions/${id}`, { method: "DELETE", headers: clientHeaders() });
-      } catch (error) {
-        console.error("Failed to delete session:", error);
-        throw new Error(deleteErrors.network);
-      }
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const message =
-          res.status === 403
-            ? deleteErrors.forbidden
-            : res.status === 404
-              ? deleteErrors.gone
-              : typeof data?.error === "string"
-                ? data.error
-                : interpolate(deleteErrors.status, { status: res.status });
-        if (res.status === 404) {
-          // Already gone — drop it from the list rather than erroring
-          setSessions((prev) => prev.filter((s) => s.id !== id));
-          return;
-        }
-        throw new Error(message);
-      }
-
-      setSessions((prev) => prev.filter((s) => s.id !== id));
-    },
-    [deleteErrors],
-  );
+  /** Resolves once the session is gone; rejects with the error for the card to describe. */
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      await apiRequest(`/api/sessions/${id}`, { method: "DELETE" });
+    } catch (error) {
+      // Already gone: drop it from the list rather than erroring.
+      const alreadyGone = error instanceof ApiError && error.code === "SESSION_NOT_FOUND";
+      if (!alreadyGone) throw error;
+    }
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
 
   const clearFilters = useCallback(() => {
     setDifficulty("all");

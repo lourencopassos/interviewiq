@@ -1,6 +1,8 @@
 /**
- * One place for "which pastel does this score get". Used by the report and
- * the history cards so a 74 looks the same everywhere.
+ * Which pastel a 0-100 score gets, everywhere in the UI (report, history card,
+ * live transcript tile, Full Loop stage card) so a 74 looks the same on every
+ * screen. These are tone bands only; the report's verdict wording is content
+ * and is decided on the server.
  *
  *   >= 75  sage    strong
  *   >= 55  butter  middling
@@ -8,9 +10,11 @@
  */
 export type ScoreTone = "sage" | "butter" | "blush";
 
+export const SCORE_BANDS = { strong: 75, middling: 55 } as const;
+
 export function scoreTone(score: number): ScoreTone {
-  if (score >= 75) return "sage";
-  if (score >= 55) return "butter";
+  if (score >= SCORE_BANDS.strong) return "sage";
+  if (score >= SCORE_BANDS.middling) return "butter";
   return "blush";
 }
 
@@ -45,4 +49,12 @@ export const toneStyles: Record<
     stroke: "stroke-blush-deep",
     fillVar: "var(--blush)",
   },
+};
+
+/** Pastel pill per question category, shared by the live question card and the report review. */
+export const categoryTone: Record<string, "sky" | "peach" | "lavender" | "butter"> = {
+  technical: "sky",
+  behavioral: "peach",
+  system_design: "lavender",
+  culture_fit: "butter",
 };

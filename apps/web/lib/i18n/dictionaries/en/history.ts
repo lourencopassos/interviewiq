@@ -23,13 +23,6 @@ export const history = {
     confirm: "Confirm",
     deleteLabel: "Delete session",
   },
-  deleteErrors: {
-    network: "Network error — could not delete session",
-    forbidden: "You can only delete your own sessions",
-    gone: "Session no longer exists",
-    status: "Failed to delete session ({status})",
-    generic: "Failed to delete session",
-  },
   deleteAll: {
     eyebrow: "privacy",
     body: "Sessions, CVs and transcripts are stored in this server's database. Saved jobs and your CV also live in this browser.",
@@ -37,8 +30,6 @@ export const history = {
     confirm: "Delete everything",
     deleting: "Deleting…",
     done: "Deleted {n} sessions from the server and cleared the CV and jobs saved in this browser.",
-    failed: "Could not delete your data ({status})",
-    network: "Network error — nothing was deleted",
   },
   empty: {
     eyebrow: "[ empty ]",

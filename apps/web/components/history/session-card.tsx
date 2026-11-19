@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Eye, Play, RotateCcw, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LOCALE_TAGS, useI18n } from "@/lib/i18n";
-import { scoreTone, toneStyles } from "@/components/report/score-tone";
+import { formatDate } from "@/lib/format";
+import { label } from "@/lib/labels";
+import { describeError, toUiError, type UiError } from "@/lib/errors";
+import { scoreTone, toneStyles } from "@/lib/score";
 
 interface SessionCardProps {
   session: {
@@ -19,7 +22,7 @@ interface SessionCardProps {
     status: string;
     report: { overallScore: number } | null;
   };
-  /** Resolves on success; rejects (or throws) with an Error on failure. */
+  /** Resolves on success; rejects with the failure (rendered with describeError). */
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -39,7 +42,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
   const localeTag = LOCALE_TAGS[locale];
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<UiError | null>(null);
 
   // Auto-reset the confirm state after a few seconds of inactivity
   useEffect(() => {
@@ -48,24 +51,12 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
     return () => clearTimeout(timeout);
   }, [confirming]);
 
-  const date = new Date(session.createdAt).toLocaleDateString(localeTag, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const date = formatDate(locale, session.createdAt);
 
   // Pills read lowercase by design; the shared labels are sentence case.
-  const difficultyLabel = (
-    (t.common.difficulty as Record<string, string>)[session.difficulty] ?? session.difficulty
-  ).toLocaleLowerCase(localeTag);
-  const typeLabel = (
-    (t.common.interviewType as Record<string, string>)[session.interviewType] ??
-    session.interviewType.replace(/_/g, " ")
-  ).toLocaleLowerCase(localeTag);
-  const statusLabel = (
-    (t.common.status as Record<string, string>)[session.status] ??
-    session.status.replace(/_/g, " ")
-  ).toLocaleLowerCase(localeTag);
+  const difficultyLabel = label(t, "difficulty", session.difficulty).toLocaleLowerCase(localeTag);
+  const typeLabel = label(t, "interviewType", session.interviewType).toLocaleLowerCase(localeTag);
+  const statusLabel = label(t, "status", session.status).toLocaleLowerCase(localeTag);
 
   const canResume = RESUMABLE_STATUSES.has(session.status);
   const unfinished = session.status !== "COMPLETED";
@@ -77,7 +68,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
       await onDelete(session.id);
       // On success the parent removes this card; nothing else to do.
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : t.history.deleteErrors.generic);
+      setDeleteError(toUiError(err));
       setConfirming(false);
     } finally {
       setDeleting(false);
@@ -185,7 +176,7 @@ export function SessionCard({ session, onDelete }: SessionCardProps) {
 
       {deleteError && (
         <p role="alert" className="text-[11px] text-rust">
-          {deleteError}
+          {describeError(t, deleteError)}
         </p>
       )}
     </article>

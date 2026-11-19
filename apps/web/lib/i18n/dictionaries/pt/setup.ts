@@ -48,11 +48,6 @@ export const setup: typeof En = {
       research: "Pesquisar a empresa",
       ready: "Pronto para começar",
     },
-    errors: {
-      network: "Erro de rede — verifique sua conexão",
-      parseFailed: "Não foi possível analisar a descrição da vaga",
-      unknown: "Algo deu errado",
-    },
   },
   preview: {
     parsed: "analisado",
@@ -109,11 +104,6 @@ export const setup: typeof En = {
     permissionMic: "Na próxima tela, vamos pedir acesso ao microfone.",
     permissionMicCamera: "Na próxima tela, vamos pedir acesso ao microfone e à câmera.",
     failedTitle: "Não foi possível começar a entrevista",
-    errors: {
-      network: "Erro de rede — verifique sua conexão e tente de novo",
-      createFailed: "Não foi possível criar a sessão ({status})",
-      unknown: "Não foi possível criar a sessão",
-    },
   },
   startOver: "Recomeçar com outra vaga",
 };

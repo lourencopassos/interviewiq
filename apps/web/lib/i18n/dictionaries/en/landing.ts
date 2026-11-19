@@ -25,6 +25,7 @@ export const landing = {
     you: "you",
     followUp: "follow-up",
     listening: "listening",
+    recordingAnswer: "Recording answer",
     waiting: "Waiting for the question to finish…",
     transcribed: "Answer transcribed · 48s",
     record: "record",

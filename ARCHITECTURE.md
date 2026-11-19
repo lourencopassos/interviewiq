@@ -117,7 +117,7 @@ With a D-ID key and a video session, the **browser requests an offer on demand**
 
 ## SSE event protocol
 
-All events share the shape `{ type, data }`. `interviewEventSchema` in `packages/types/src/events.ts` is the single source: the server builds events against its inferred `InterviewEvent` type (`packages/ai/src/interview/events.ts`) and the client validates incoming payloads with it:
+All events share the shape `{ type, data }`. `interviewEventSchema` in `packages/types/src/events.ts` is the single source: the server builds events against its inferred `InterviewEvent` type (`packages/ai/src/interview/events.ts`) and the client validates incoming payloads with it, dropping (and logging) any frame that does not match:
 
 | Event | When |
 |---|---|
@@ -197,11 +197,11 @@ What this means for hosting:
 | Concern | File |
 |---|---|
 | Interview lifecycle | `packages/ai/src/interview/orchestrator.ts` (state machine) and its collaborators in `packages/ai/src/interview/` |
-| Errors | `packages/ai/src/errors.ts` (`AppError`), `apps/web/lib/api-response.ts` (`apiError`), `packages/types/src/errors.ts` (`ErrorCode`) |
+| Errors | `packages/ai/src/errors.ts` (`AppError`), `apps/web/lib/api-response.ts` (`apiError`), `packages/types/src/errors.ts` (`ErrorCode`); in the browser `apps/web/lib/api-client.ts` (`apiFetch`, `ApiError`) and `apps/web/lib/errors.ts` (`describeError`, code → `t.errors.api` copy) |
 | Next-question rules | `packages/ai/src/services/adaptive-engine.ts` |
 | Audio pre-fetch and serving | `packages/ai/src/cache/tts-cache.ts`, `apps/web/app/api/audio/[blobId]/route.ts` |
 | SSE connections | `packages/ai/src/sse/emitter.ts`, `apps/web/app/api/interview/[id]/stream/route.ts` |
-| Browser event handling | `apps/web/hooks/useInterviewStream.ts`, `apps/web/app/interview/[id]/page.tsx` |
+| Browser event handling | `apps/web/hooks/useInterviewStream.ts` (validates every frame with `interviewEventSchema`), `apps/web/lib/interview/phase-machine.ts` (pure reducer: what the candidate can do now), `apps/web/hooks/useInterviewController.ts` (wires stream, recorder, playback, avatar and coach to it) |
 | Recording and playback | `apps/web/hooks/useAudioRecorder.ts`, `apps/web/hooks/useAudioPlayback.ts` |
 | Report assembly | `packages/ai/src/services/report-service.ts` |
 | Mock mode | `packages/ai/src/mock/`, `apps/web/lib/with-mock-mode.ts` |

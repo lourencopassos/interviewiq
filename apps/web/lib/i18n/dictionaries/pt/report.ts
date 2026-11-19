@@ -9,13 +9,8 @@ export const report: typeof En = {
     check: "verificação {n}/{total}",
   },
   fetchErrors: {
-    network: "Erro de rede — não foi possível carregar o relatório",
     timeout: "O relatório está demorando mais que o esperado. Você pode tentar gerá-lo de novo.",
     failed: "A geração do relatório falhou.",
-    loadStatus: "Falha ao carregar o relatório ({status})",
-    regenerateStatus: "Falha ao gerar de novo ({status})",
-    regenerateNetwork: "Erro de rede — tente de novo",
-    regenerateFailed: "Falha ao gerar de novo",
   },
   notFound: {
     eyebrow: "[ 404 ] sessão não encontrada",
@@ -105,12 +100,6 @@ export const report: typeof En = {
     interviewerNotes: "notas do entrevistador",
     strengths: "pontos fortes",
     gaps: "lacunas",
-    category: {
-      technical: "técnica",
-      behavioral: "comportamental",
-      system_design: "system design",
-      culture_fit: "fit cultural",
-    },
   },
   coach: {
     coached: "com coach",

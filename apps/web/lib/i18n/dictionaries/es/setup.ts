@@ -48,11 +48,6 @@ export const setup: typeof En = {
       research: "Investigar la empresa",
       ready: "Listo para empezar",
     },
-    errors: {
-      network: "Error de red: revisa tu conexión",
-      parseFailed: "No se pudo analizar la descripción del puesto",
-      unknown: "Algo salió mal",
-    },
   },
   preview: {
     parsed: "analizado",
@@ -109,11 +104,6 @@ export const setup: typeof En = {
     permissionMic: "En la siguiente pantalla te pediremos acceso al micrófono.",
     permissionMicCamera: "En la siguiente pantalla te pediremos acceso al micrófono y a la cámara.",
     failedTitle: "No se pudo empezar la entrevista",
-    errors: {
-      network: "Error de red: revisa tu conexión e inténtalo de nuevo",
-      createFailed: "No se pudo crear la sesión ({status})",
-      unknown: "No se pudo crear la sesión",
-    },
   },
   startOver: "Empezar de nuevo con otra oferta",
 };

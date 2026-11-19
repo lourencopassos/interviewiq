@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { CoachNoteView } from "@interviewiq/types";
 import { cn } from "@/lib/utils";
-import { interpolate, useI18n } from "@/lib/i18n";
-import { scoreTone, toneStyles } from "./score-tone";
+import { interpolate, LOCALE_TAGS, useI18n } from "@/lib/i18n";
+import { label } from "@/lib/labels";
+import { categoryTone, scoreTone, toneStyles } from "@/lib/score";
 
 interface ReviewQuestion {
   id: string;
@@ -27,22 +28,22 @@ interface QuestionReviewProps {
   questions: ReviewQuestion[];
 }
 
-const categoryTone: Record<string, string> = {
-  technical: "bg-sky text-sky-deep",
-  behavioral: "bg-peach text-peach-deep",
-  system_design: "bg-lavender text-lavender-deep",
-  culture_fit: "bg-butter text-butter-deep",
-};
+const pillTone = {
+  sky: "bg-sky text-sky-deep",
+  peach: "bg-peach text-peach-deep",
+  lavender: "bg-lavender text-lavender-deep",
+  butter: "bg-butter text-butter-deep",
+} as const;
 
 function QuestionCard({ question }: { question: ReviewQuestion }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const copy = t.report.questionReview;
   const [isOpen, setIsOpen] = useState(false);
   const panelId = `question-review-${question.id}`;
   const tone = question.score !== null ? toneStyles[scoreTone(question.score)] : null;
-  const categoryLabel =
-    (copy.category as Record<string, string>)[question.category] ??
-    question.category.replace(/_/g, " ");
+  // Pills read lowercase by design; the shared labels are sentence case.
+  const categoryLabel = label(t, "category", question.category).toLocaleLowerCase(LOCALE_TAGS[locale]);
+  const tonePill = categoryTone[question.category];
   const coachNotes = question.coachNotes ?? [];
   const coachedBeforeAnswer = question.coachedBeforeAnswer ?? false;
 
@@ -66,7 +67,7 @@ function QuestionCard({ question }: { question: ReviewQuestion }) {
           {coachedBeforeAnswer && (
             <span className="pill bg-lavender text-lavender-deep">{t.report.coach.coached}</span>
           )}
-          <span className={cn("pill hidden sm:inline-flex", categoryTone[question.category] ?? "bg-card")}>
+          <span className={cn("pill hidden sm:inline-flex", tonePill ? pillTone[tonePill] : "bg-card")}>
             {categoryLabel}
           </span>
           {question.score !== null && tone && (

@@ -29,6 +29,7 @@ export const common: typeof En = {
     ABANDONED: "Abandonada",
   },
   tier: { poor: "falta profundidad", good: "buena", excellent: "excelente" },
+  category: { technical: "Técnica", behavioral: "Conductual", system_design: "Diseño de sistemas", culture_fit: "Encaje cultural" },
   score: "Puntaje",
   question: "Pregunta",
   mock: { on: "Mock activo", off: "Mock inactivo", titleOn: "Modo mock activo: sin llamadas pagas a la API", titleOff: "Modo mock inactivo: llamadas reales a la API" },

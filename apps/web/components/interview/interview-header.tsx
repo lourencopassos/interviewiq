@@ -4,6 +4,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { formatDuration } from "@/lib/format";
+import { label } from "@/lib/labels";
 
 interface InterviewHeaderProps {
   companyName: string;
@@ -58,12 +60,8 @@ export function InterviewHeader({
     return () => clearInterval(timer);
   }, [paused]);
 
-  const minutes = Math.floor(elapsed / 60);
-  const seconds = elapsed % 60;
-  const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-
-  const difficultyLabel =
-    (t.common.difficulty as Record<string, string>)[difficulty] ?? difficulty;
+  const timeStr = formatDuration(elapsed, { padMinutes: true });
+  const difficultyLabel = label(t, "difficulty", difficulty);
 
   return (
     <div className="sticky top-0 z-30 -mx-2 bg-paper/90 px-2 pb-2 pt-2 backdrop-blur-md">

@@ -2,104 +2,47 @@
 
 import { useEffect, useReducer, useCallback, useState } from "react";
 import {
+  interviewEventSchema,
   normalizeAudioMimeType,
-  type AvatarFailureCode,
+  type InterviewEvent,
+  type InterviewEventOf,
   type SessionStatus,
 } from "@interviewiq/types";
-import { clientHeaders, getClientId } from "@/lib/client-id";
+import { getClientId } from "@/lib/client-id";
+import { apiRequest } from "@/lib/api-client";
+import { useLatest } from "@/hooks/useLatest";
 
-interface InterviewState {
+type EventData<T extends InterviewEvent["type"]> = InterviewEventOf<T>["data"];
+
+export type ConnectionStatus = "connecting" | "connected" | "reconnecting" | "error";
+
+/** Client mirror of the server's interview state, built only from SSE events. */
+export interface InterviewStreamState {
   status: SessionStatus | null;
-  currentQuestion: {
-    questionId: string;
-    text: string;
-    category: string;
-    order: number;
-    total: number;
-    isFollowUp?: boolean;
-  } | null;
+  currentQuestion: EventData<"question_ready"> | null;
   audioUrl: string | null;
   transcript: string | null;
-  evaluation: { score: number; tier: string } | null;
+  evaluation: Omit<EventData<"evaluation_complete">, "questionId"> | null;
   transitionMessage: string | null;
-  stageTransition: {
-    completedStage: string;
-    stageScore: number;
-    nextStage: string;
-    transitionAudioUrl: string;
-  } | null;
-  currentStage: string | null;
-  avatarStreamData: {
-    streamId: string;
-    sdpOffer: RTCSessionDescriptionInit;
-    iceServers: RTCIceServer[];
-    presenterUrl?: string;
-  } | null;
-  avatarFailed: boolean;
-  /** Stable code from the last `avatar_stream_failed` event, mapped to copy by the page. */
-  avatarFailureCode: AvatarFailureCode | null;
-  isComplete: boolean;
+  stageTransition: EventData<"stage_transition"> | null;
+  avatarStreamData: EventData<"avatar_stream_ready"> | null;
+  /** Code from the last `avatar_stream_failed`; null while video mode is healthy. */
+  avatarFailureCode: EventData<"avatar_stream_failed">["code"] | null;
   redirectTo: string | null;
-  connectionStatus: "connecting" | "connected" | "reconnecting" | "error";
-  error: { code: string; message: string; retryable: boolean } | null;
+  connectionStatus: ConnectionStatus;
+  /** Last server `error` event. Rendered by code; `message` is for logs. */
+  error: EventData<"error"> | null;
 }
 
-type InterviewAction =
-  | { type: "state_change"; payload: { status: SessionStatus } }
-  | {
-      type: "question_ready";
-      payload: {
-        questionId: string;
-        text: string;
-        category: string;
-        order: number;
-        total: number;
-      };
-    }
-  | { type: "audio_ready"; payload: { questionId: string; audioUrl: string } }
-  | {
-      type: "transcription_complete";
-      payload: { questionId: string; transcript: string };
-    }
-  | {
-      type: "evaluation_complete";
-      payload: { questionId: string; score: number; tier: string };
-    }
-  | { type: "transition_text"; payload: { message: string } }
-  | {
-      type: "stage_transition";
-      payload: {
-        completedStage: string;
-        stageScore: number;
-        nextStage: string;
-        transitionAudioUrl: string;
-      };
-    }
-  | {
-      type: "interview_complete";
-      payload: { sessionId: string; redirectTo: string };
-    }
-  | {
-      type: "avatar_stream_ready";
-      payload: {
-        sessionId: string;
-        streamId: string;
-        sdpOffer: RTCSessionDescriptionInit;
-        iceServers: RTCIceServer[];
-        presenterUrl?: string;
-      };
-    }
-  | { type: "avatar_stream_failed"; payload: { code?: AvatarFailureCode; reason: string } }
-  | {
-      type: "error";
-      payload: { code: string; message: string; retryable: boolean };
-    }
+/** Every validated SSE event, plus the hook's own connection bookkeeping. */
+type StreamAction =
+  | InterviewEvent
   | { type: "clear_error" }
   | { type: "connection_open" }
   | { type: "connection_reset" }
-  | { type: "connection_error"; payload: { exhausted: boolean } };
+  | { type: "connection_error"; exhausted: boolean };
 
-const initialState: InterviewState = {
+const initialState: InterviewStreamState = {
   status: null,
   currentQuestion: null,
   audioUrl: null,
@@ -107,28 +50,22 @@ const initialState: InterviewState = {
   evaluation: null,
   transitionMessage: null,
   stageTransition: null,
-  currentStage: null,
   avatarStreamData: null,
-  avatarFailed: false,
   avatarFailureCode: null,
-  isComplete: false,
   redirectTo: null,
   connectionStatus: "connecting",
   error: null,
 };
 
-function interviewReducer(
-  state: InterviewState,
-  action: InterviewAction,
-): InterviewState {
+function streamReducer(state: InterviewStreamState, action: StreamAction): InterviewStreamState {
   switch (action.type) {
     case "state_change":
-      return { ...state, status: action.payload.status };
+      return { ...state, status: action.data.status };
 
     case "question_ready":
       return {
         ...state,
-        currentQuestion: action.payload,
+        currentQuestion: action.data,
         error: state.error?.code === "START_FAILED" ? null : state.error,
         transcript: null,
         evaluation: null,
@@ -137,57 +74,36 @@ function interviewReducer(
       };
 
     case "audio_ready":
-      return state.currentQuestion?.questionId === action.payload.questionId
-        ? { ...state, audioUrl: action.payload.audioUrl }
+      return state.currentQuestion?.questionId === action.data.questionId
+        ? { ...state, audioUrl: action.data.audioUrl }
         : state;
 
     case "transcription_complete":
-      return { ...state, transcript: action.payload.transcript };
+      return { ...state, transcript: action.data.transcript };
 
     case "evaluation_complete":
-      return {
-        ...state,
-        evaluation: {
-          score: action.payload.score,
-          tier: action.payload.tier,
-        },
-      };
+      return { ...state, evaluation: { score: action.data.score, tier: action.data.tier } };
 
     case "transition_text":
-      return { ...state, transitionMessage: action.payload.message };
+      return { ...state, transitionMessage: action.data.message };
 
     case "stage_transition":
-      return {
-        ...state,
-        stageTransition: action.payload,
-        currentStage: action.payload.nextStage,
-      };
+      return { ...state, stageTransition: action.data };
 
     case "interview_complete":
-      return {
-        ...state,
-        isComplete: true,
-        redirectTo: action.payload.redirectTo,
-      };
+      return { ...state, redirectTo: action.data.redirectTo };
 
     case "avatar_stream_ready":
-      return {
-        ...state,
-        avatarFailed: false,
-        avatarFailureCode: null,
-        avatarStreamData: {
-          streamId: action.payload.streamId,
-          sdpOffer: action.payload.sdpOffer,
-          iceServers: action.payload.iceServers,
-          presenterUrl: action.payload.presenterUrl,
-        },
-      };
+      return { ...state, avatarFailureCode: null, avatarStreamData: action.data };
 
     case "avatar_stream_failed":
-      return { ...state, avatarFailed: true, avatarFailureCode: action.payload.code ?? "AVATAR_UNAVAILABLE" };
+      return { ...state, avatarFailureCode: action.data.code };
+
+    case "avatar_stream_audio":
+      return state;
 
     case "error":
-      return { ...state, error: action.payload };
+      return { ...state, error: action.data };
 
     case "clear_error":
       return { ...state, error: null };
@@ -199,20 +115,42 @@ function interviewReducer(
       return { ...state, connectionStatus: "connecting" };
 
     case "connection_error":
-      return {
-        ...state,
-        connectionStatus: action.payload.exhausted ? "error" : "reconnecting",
-      };
-
-    default:
-      return state;
+      return { ...state, connectionStatus: action.exhausted ? "error" : "reconnecting" };
   }
+}
+
+/** Parse one SSE frame against the shared protocol; invalid frames are dropped. */
+function parseEvent(raw: string): InterviewEvent | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    console.warn("Ignoring a non-JSON SSE frame:", raw);
+    return null;
+  }
+  const parsed = interviewEventSchema.safeParse(json);
+  if (!parsed.success) {
+    console.warn(
+      "Ignoring an SSE frame that does not match the event protocol:",
+      parsed.error.issues,
+      json,
+    );
+    return null;
+  }
+  return parsed.data;
 }
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 
-export function useInterviewStream(sessionId: string) {
-  const [state, dispatch] = useReducer(interviewReducer, initialState);
+/**
+ * One EventSource per interview session (with capped exponential reconnect).
+ * Every valid event updates the mirrored state and is also handed to
+ * `onEvent`, so callers can react to the event itself (start a recording
+ * phase, connect the avatar) instead of watching state for changes.
+ */
+export function useInterviewStream(sessionId: string, onEvent?: (event: InterviewEvent) => void) {
+  const [state, dispatch] = useReducer(streamReducer, initialState);
+  const onEventRef = useLatest(onEvent);
   // Bumping this value tears down the current EventSource and opens a new one
   // with a fresh reconnect budget.
   const [connectionNonce, setConnectionNonce] = useState(0);
@@ -234,13 +172,11 @@ export function useInterviewStream(sessionId: string) {
         dispatch({ type: "connection_open" });
       };
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          dispatch({ type: data.type, payload: data.data });
-        } catch {
-          console.warn("Failed to parse SSE event:", event.data);
-        }
+      eventSource.onmessage = (message: MessageEvent<string>) => {
+        const event = parseEvent(message.data);
+        if (!event) return;
+        dispatch(event);
+        onEventRef.current?.(event);
       };
 
       eventSource.onerror = () => {
@@ -250,13 +186,10 @@ export function useInterviewStream(sessionId: string) {
 
         reconnectAttempts++;
         const exhausted = reconnectAttempts > MAX_RECONNECT_ATTEMPTS;
-        dispatch({ type: "connection_error", payload: { exhausted } });
+        dispatch({ type: "connection_error", exhausted });
 
         if (!exhausted) {
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectAttempts - 1),
-            16000,
-          );
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 16000);
           reconnectTimeout = setTimeout(connect, delay);
         }
       };
@@ -270,7 +203,7 @@ export function useInterviewStream(sessionId: string) {
       eventSource?.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, [sessionId, connectionNonce]);
+  }, [sessionId, connectionNonce, onEventRef]);
 
   /** Dismiss the last server-side error. */
   const clearError = useCallback(() => {
@@ -282,31 +215,13 @@ export function useInterviewStream(sessionId: string) {
     setConnectionNonce((n) => n + 1);
   }, []);
 
+  /** Upload an answer. Results arrive as SSE events; throws ApiError / NetworkError. */
   const submitAnswer = useCallback(
     async (audioBlob: Blob) => {
       const formData = new FormData();
       const { extension } = normalizeAudioMimeType(audioBlob.type);
       formData.append("audio", audioBlob, `answer.${extension}`);
-
-      let response: Response;
-      try {
-        response = await fetch(`/api/interview/${sessionId}/answer`, {
-          method: "POST",
-          headers: clientHeaders(),
-          body: formData,
-        });
-      } catch {
-        throw new Error("Network error — could not upload your answer");
-      }
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(
-          typeof data?.error === "string"
-            ? data.error
-            : `Failed to submit answer (${response.status})`,
-        );
-      }
+      await apiRequest(`/api/interview/${sessionId}/answer`, { method: "POST", body: formData });
     },
     [sessionId],
   );

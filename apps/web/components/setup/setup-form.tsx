@@ -3,7 +3,8 @@
 import { AlertCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useSetupStore, SETUP_ERROR_CODES } from "@/lib/stores/setup-store";
+import { useSetupStore } from "@/lib/stores/setup-store";
+import { describeError } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { JobDescriptionInput } from "./job-description-input";
 import { SavedSetup } from "./saved-setup";
@@ -27,13 +28,7 @@ export function SetupForm() {
     jobDescription.length >= JOB_DESCRIPTION_MIN_LENGTH && (step === "input" || step === "error");
   const isAnalyzing = step === "parsing" || step === "researching";
 
-  // Store-emitted codes get localized copy; raw server messages show as-is.
-  const errorCopy: Record<string, string> = {
-    [SETUP_ERROR_CODES.network]: t.setup.analysis.errors.network,
-    [SETUP_ERROR_CODES.parseFailed]: t.setup.analysis.errors.parseFailed,
-    [SETUP_ERROR_CODES.unknown]: t.setup.analysis.errors.unknown,
-  };
-  const errorMessage = error ? (errorCopy[error] ?? error) : null;
+  const errorMessage = error ? describeError(t, error) : null;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">

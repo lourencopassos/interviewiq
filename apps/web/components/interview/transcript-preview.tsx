@@ -3,6 +3,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { label } from "@/lib/labels";
+import { scoreTone, toneStyles } from "@/lib/score";
 
 interface TranscriptPreviewProps {
   transcript: string | null;
@@ -10,12 +12,6 @@ interface TranscriptPreviewProps {
   /** Evaluation of this answer, once it lands. Rendered as a pop-in score tile. */
   score?: number;
   tier?: string;
-}
-
-function scoreTone(score: number): string {
-  if (score >= 80) return "bg-sage text-sage-deep";
-  if (score >= 65) return "bg-butter text-butter-deep";
-  return "bg-blush text-blush-deep";
 }
 
 /** The candidate's row: a quiet sheet with the transcript, then the score tile. */
@@ -28,7 +24,7 @@ export function TranscriptPreview({
   const { t } = useI18n();
   if (!isProcessing && !transcript) return null;
 
-  const tierLabel = tier ? ((t.common.tier as Record<string, string>)[tier] ?? tier) : null;
+  const tierLabel = tier ? label(t, "tier", tier) : null;
 
   return (
     <div className="sheet animate-fade-up p-4 sm:p-5">
@@ -57,7 +53,7 @@ export function TranscriptPreview({
           key={score}
           className={cn(
             "mt-4 flex items-center gap-3 rounded-md border-1.5 border-ink px-3 py-2 shadow-pop-sm animate-pop-in",
-            scoreTone(score),
+            toneStyles[scoreTone(score)].tile,
           )}
         >
           <span className="text-xl font-extrabold tabular-nums">{score}</span>

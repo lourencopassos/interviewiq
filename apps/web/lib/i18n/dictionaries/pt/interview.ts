@@ -33,12 +33,6 @@ export const interview: typeof En = {
   question: {
     eyebrow: "Entrevistador · pergunta {order} de {total}",
     followUp: "aprofundamento",
-    category: {
-      technical: "Técnica",
-      behavioral: "Comportamental",
-      system_design: "System design",
-      culture_fit: "Fit cultural",
-    },
   },
   record: {
     ready: "Gravar resposta",
@@ -98,11 +92,11 @@ export const interview: typeof En = {
       title: "Não foi possível iniciar a entrevista",
       retrying: "Tentando de novo…",
       back: "Voltar à configuração",
+      notFound: "Esta entrevista não existe ou foi iniciada em outro navegador.",
     },
     submit: {
       title: "Sua resposta não foi enviada",
       retryUpload: "Reenviar",
-      retrying: "Tentando de novo…",
       recordAgain: "Gravar de novo",
     },
     mic: {
@@ -112,29 +106,6 @@ export const interview: typeof En = {
     recording: {
       title: "Problema na gravação",
     },
-  },
-  errors: {
-    network: "Erro de rede — verifique sua conexão",
-    startFailed: "Não foi possível iniciar a entrevista",
-    notFound: "Esta entrevista não existe ou foi iniciada em outro navegador.",
-    startFailedStatus: "Não foi possível iniciar a entrevista ({status})",
-    submitFailed: "Não foi possível enviar sua resposta",
-    uploadNetwork: "Erro de rede — não foi possível enviar sua resposta",
-    recordStartFailed: "Não foi possível iniciar a gravação",
-    recordFailed: "A gravação falhou — tente de novo",
-    noMicrophone: "Nenhum microfone foi encontrado. Conecte um e tente de novo.",
-  },
-  serverErrors: {
-    AUDIO_UNAVAILABLE:
-      "Não foi possível gerar o áudio desta pergunta. Leia o texto e grave sua resposta.",
-    NO_QUESTION: "Nenhuma pergunta atual encontrada.",
-    REPORT_FAILED:
-      "Não foi possível gerar o seu relatório. Suas respostas estão salvas — você pode tentar de novo na página do relatório.",
-    START_FAILED: "Não foi possível iniciar a entrevista. Tente de novo.",
-    COACH_FAILED: "O coach não está disponível agora.",
-    AVATAR_UNAVAILABLE: "O entrevistador em vídeo não está disponível. Seguimos só com áudio.",
-    AVATAR_QUOTA: "O serviço de vídeo atingiu o limite de transmissões simultâneas. Seguimos só com áudio.",
-    AVATAR_NO_CREDITS: "A conta do serviço de vídeo está sem créditos. Seguimos só com áudio.",
   },
   stop: {
     button: "Encerrar entrevista",

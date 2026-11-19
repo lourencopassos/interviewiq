@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Mic, CornerDownRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { scoreTone, toneStyles } from "@/lib/score";
 
 /**
  * The hero's signature: a looping, scripted interview that shows the product's
@@ -14,36 +15,41 @@ import { cn } from "@/lib/utils";
 interface Beat {
   question: string;
   score: number;
+  tier: Tier;
   feedback: string;
   followUp?: string;
 }
 
-/** Scores for the three scripted beats; the copy lives in the dictionary. */
-const SCORES = [82, 58, 91];
+type Tier = "poor" | "good" | "excellent";
+
+/** Scores and evaluator tiers for the three scripted beats; the copy lives in the dictionary. */
+const SCORES: { score: number; tier: Tier }[] = [
+  { score: 82, tier: "excellent" },
+  { score: 58, tier: "poor" },
+  { score: 91, tier: "excellent" },
+];
 
 type Phase = "typing" | "listening" | "scoring" | "followup";
-
-function tone(score: number) {
-  if (score >= 80) return { bg: "bg-sage", fg: "text-sage-deep", tier: "excellent" as const };
-  if (score >= 65) return { bg: "bg-butter", fg: "text-butter-deep", tier: "good" as const };
-  return { bg: "bg-blush", fg: "text-blush-deep", tier: "poor" as const };
-}
 
 export function InterviewDemo({ className }: { className?: string }) {
   const { t } = useI18n();
   const D = t.landing.demo;
-  const SCRIPT: Beat[] = D.script.map((b, i) => ({
-    question: b.question,
-    feedback: b.feedback,
-    followUp: "followUp" in b ? (b as { followUp?: string }).followUp : undefined,
-    score: SCORES[i] ?? 70,
-  }));
+  const script = useMemo<Beat[]>(
+    () =>
+      D.script.map((b, i) => ({
+        question: b.question,
+        feedback: b.feedback,
+        followUp: "followUp" in b ? (b as { followUp?: string }).followUp : undefined,
+        ...(SCORES[i] ?? { score: 70, tier: "good" }),
+      })),
+    [D.script],
+  );
   const [beat, setBeat] = useState(0);
   const [phase, setPhase] = useState<Phase>("typing");
   const [typed, setTyped] = useState(0);
   const [reduced, setReduced] = useState(false);
 
-  const current = SCRIPT[beat];
+  const current = script[beat];
   const text = phase === "followup" && current.followUp ? current.followUp : current.question;
 
   useEffect(() => {
@@ -69,8 +75,7 @@ export function InterviewDemo({ className }: { className?: string }) {
       if (i >= text.length) clearInterval(id);
     }, 22);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beat, phase, reduced]);
+  }, [text, phase, reduced]);
 
   // Phase machine
   useEffect(() => {
@@ -86,16 +91,15 @@ export function InterviewDemo({ className }: { className?: string }) {
         if (current.followUp && phase === "scoring" && text === current.question) {
           setPhase("followup");
         } else {
-          setBeat((b) => (b + 1) % SCRIPT.length);
+          setBeat((b) => (b + 1) % script.length);
           setPhase("typing");
         }
       }, 2200);
     }
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, beat, reduced]);
+  }, [phase, reduced, text, current, script.length]);
 
-  const tn = tone(current.score);
+  const tone = toneStyles[scoreTone(current.score)];
   const showScore = phase === "scoring" || reduced;
   const isFollowUp = phase === "followup";
 
@@ -111,7 +115,7 @@ export function InterviewDemo({ className }: { className?: string }) {
           {D.live}
         </div>
         <ol className="hidden items-center gap-1 sm:flex" aria-hidden>
-          {SCRIPT.map((_, i) => (
+          {script.map((_, i) => (
             <li
               key={i}
               className={cn(
@@ -154,7 +158,7 @@ export function InterviewDemo({ className }: { className?: string }) {
           </div>
           <div className="flex min-h-[2.75rem] min-w-0 flex-1 items-center">
             {phase === "listening" || reduced ? (
-              <div className="flex h-9 items-center gap-[3px]" aria-label="Recording answer">
+              <div className="flex h-9 items-center gap-[3px]" aria-label={D.recordingAnswer}>
                 {Array.from({ length: 28 }).map((_, i) => (
                   <span
                     key={i}
@@ -185,12 +189,12 @@ export function InterviewDemo({ className }: { className?: string }) {
               key={`${beat}-${isFollowUp}`}
               className={cn(
                 "flex items-center gap-3 rounded-md border-1.5 border-ink px-3 py-2 shadow-pop-sm animate-pop-in",
-                tn.bg,
+                tone.tile,
               )}
             >
-              <span className={cn("text-xl font-extrabold tabular-nums", tn.fg)}>{current.score}</span>
-              <span className={cn("pill border-ink/70 bg-card/70", tn.fg)}>{t.common.tier[tn.tier]}</span>
-              <span className={cn("truncate text-[12px]", tn.fg)}>{current.feedback}</span>
+              <span className="text-xl font-extrabold tabular-nums">{current.score}</span>
+              <span className="pill border-ink/70 bg-card/70">{t.common.tier[current.tier]}</span>
+              <span className="truncate text-[12px]">{current.feedback}</span>
             </div>
           )}
         </div>
