@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSetupStore, SETUP_ERROR_CODES } from "@/lib/stores/setup-store";
 import { useI18n } from "@/lib/i18n";
 import { JobDescriptionInput } from "./job-description-input";
-import { ResumeInput } from "./resume-input";
+import { SavedSetup } from "./saved-setup";
 import { InterviewConfig } from "./interview-config";
 import { AnalysisProgress } from "./analysis-progress";
 import { JobPreviewCard } from "./job-preview-card";
@@ -21,7 +21,7 @@ import { CoachToggle } from "./coach-toggle";
  */
 export function SetupForm() {
   const { t } = useI18n();
-  const { step, error, jobDescription, analyzeJob, reset } = useSetupStore();
+  const { step, restored, error, jobDescription, analyzeJob, reset } = useSetupStore();
   const canAnalyze =
     jobDescription.length >= 50 && (step === "input" || step === "error");
   const isAnalyzing = step === "parsing" || step === "researching";
@@ -36,6 +36,7 @@ export function SetupForm() {
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
+      <SavedSetup />
       {/* ------------------------------------------------------------ */}
       {/* [ 01 ] the posting                                             */}
       {/* ------------------------------------------------------------ */}
@@ -71,7 +72,7 @@ export function SetupForm() {
         )}
 
         {/* Progress log: while analyzing and once ready */}
-        {(isAnalyzing || step === "ready") && <AnalysisProgress />}
+        {(isAnalyzing || (step === "ready" && !restored)) && <AnalysisProgress />}
       </div>
 
       {/* ------------------------------------------------------------ */}
@@ -87,10 +88,9 @@ export function SetupForm() {
           <h2 className="mt-1 text-lg">{t.setup.configure.title}</h2>
 
           <div className="mt-5 space-y-6">
-            <InterviewConfig />
+            <InterviewConfig disabled={isAnalyzing} />
             <VideoModeToggle disabled={isAnalyzing} />
             <CoachToggle disabled={isAnalyzing} />
-            <ResumeInput />
           </div>
         </section>
 

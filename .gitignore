@@ -37,3 +37,6 @@ pnpm-debug.log*
 # Working notes
 FIXES.md
 .claude/
+
+# TypeScript incremental state
+*.tsbuildinfo

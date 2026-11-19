@@ -44,15 +44,13 @@ Evaluate the candidate's answer and return JSON:
 
 Be rigorous but fair. Score calibrated to the ${difficulty} difficulty level.
 shortFeedback should be natural and conversational — it will be spoken aloud as a transition.
-followUp should dig deeper into gaps or test edge case knowledge.
+For a self-introduction, evaluate clarity and relevance. A concise overview is sufficient; technical depth, metrics and a detailed project story belong in later questions.
+When a follow-up is useful, ask one short question about a choice, observation or gap in this answer. Use the candidate's own example. If they gave no example and the question called for one, invite them to choose one. The scoring guide describes evidence to look for; credit other sound approaches.
 ${resumeText ? `
 Candidate's resume/CV context:
 ${resumeText}
 
-Use this context to:
-- Assess consistency between CV claims and demonstrated knowledge
-- Provide feedback that references their specific background
-- Note when answers align well with or fall short of stated experience
+Use the CV to understand references the candidate makes. Score what the question asked and what the candidate said.
 ` : ""}
 ${languageInstruction(params.language)}
 Return ONLY valid JSON.`;

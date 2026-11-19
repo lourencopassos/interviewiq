@@ -16,6 +16,10 @@ interface AvatarPanelProps {
   remoteStream: MediaStream | null;
   /** Whether the avatar WebRTC connection is established */
   isStreamConnected: boolean;
+  /** True while D-ID is sending frames (only during a talk). */
+  hasFrames?: boolean;
+  /** Presenter still, shown whenever frames are not flowing. */
+  presenterUrl?: string | null;
   isPlaying: boolean;
   phase: AvatarPhase;
   isMockMode: boolean;
@@ -24,6 +28,8 @@ interface AvatarPanelProps {
 export function AvatarPanel({
   remoteStream,
   isStreamConnected,
+  hasFrames = false,
+  presenterUrl = null,
   isPlaying,
   phase,
   isMockMode,
@@ -39,10 +45,14 @@ export function AvatarPanel({
       // explicitly so the avatar's WebRTC audio never doubles the TTS playback.
       video.muted = true;
       video.srcObject = remoteStream;
+      void video.play().catch(() => {
+        // Muted autoplay is allowed; a rejection only means no frames yet
+      });
     }
   }, [remoteStream]);
 
   const showLiveAvatar = isStreamConnected && remoteStream && !isMockMode;
+  const showStill = Boolean(presenterUrl) && !isMockMode && (!showLiveAvatar || !hasFrames);
   const isSpeaking = phase === "speaking" || isPlaying;
 
   const phaseLabels: Record<AvatarPhase, string> = {
@@ -59,15 +69,36 @@ export function AvatarPanel({
       {showLiveAvatar && (
         <video
           ref={videoRef}
-          className="h-full w-full object-cover"
+          className={cn("h-full w-full object-cover", !hasFrames && "invisible")}
           muted // Audio plays through useAudioPlayback
           playsInline
           autoPlay
         />
       )}
 
+      {/* Presenter still: D-ID only streams frames while talking, so this covers the gaps */}
+      {showStill && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={presenterUrl ?? undefined}
+          alt=""
+          aria-hidden
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover",
+            isSpeaking && !hasFrames && "animate-avatar-speaking",
+          )}
+        />
+      )}
+
+      {/* Status pill over the still when the live avatar is unavailable */}
+      {showStill && phase === "fallback" && (
+        <div className="absolute left-3 top-3">
+          <span className="pill bg-butter text-butter-deep">{phaseLabels.fallback}</span>
+        </div>
+      )}
+
       {/* Static avatar (mock mode, fallback, or waiting for stream) */}
-      {!showLiveAvatar && (
+      {!showLiveAvatar && !showStill && (
         <div className="flex h-full w-full items-center justify-center">
           <div
             className={cn(

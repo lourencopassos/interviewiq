@@ -7,8 +7,7 @@ import { useI18n, interpolate, LOCALE_TAGS } from "@/lib/i18n";
 
 export function ResumeInput() {
   const { t, locale } = useI18n();
-  const { resumeText, setResumeText, step } = useSetupStore();
-  const disabled = step !== "input" && step !== "error";
+  const { resumeText, setResumeText } = useSetupStore();
   const charCount = resumeText.length;
 
   return (
@@ -34,7 +33,7 @@ export function ResumeInput() {
         placeholder={t.setup.resume.placeholder}
         value={resumeText}
         onChange={(e) => setResumeText(e.target.value)}
-        disabled={disabled}
+        maxLength={20000}
         aria-describedby="resume-text-hint"
         className="min-h-[120px] resize-y"
       />

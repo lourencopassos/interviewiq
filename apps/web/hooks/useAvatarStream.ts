@@ -7,6 +7,8 @@ interface AvatarStreamState {
   remoteStream: MediaStream | null;
   /** Whether the WebRTC connection is established */
   isConnected: boolean;
+  /** D-ID only sends video frames while the avatar talks; false between talks. */
+  hasFrames: boolean;
   /** Whether the avatar is currently speaking (audio injected) */
   isSpeaking: boolean;
   /** Error message if connection failed */
@@ -25,6 +27,7 @@ const DISCONNECT_GRACE_MS = 5000;
 const initialState: AvatarStreamState = {
   remoteStream: null,
   isConnected: false,
+  hasFrames: false,
   isSpeaking: false,
   error: null,
 };
@@ -76,12 +79,13 @@ export function useAvatarStream(sessionId: string) {
           return;
         }
 
-        // Replace any previous connection
+        // Replace any previous connection and start clean
         if (peerConnectionRef.current) {
           peerConnectionRef.current.close();
           peerConnectionRef.current = null;
         }
         clearDisconnectTimer();
+        setState({ ...initialState });
 
         // Create peer connection with D-ID's ICE servers
         const pc = new RTCPeerConnection({
@@ -93,6 +97,15 @@ export function useAvatarStream(sessionId: string) {
         pc.ontrack = (event) => {
           const stream =
             event.streams[0] ?? new MediaStream([event.track]);
+          if (event.track.kind === "video") {
+            const track = event.track;
+            const update = () =>
+              setState((prev) => (prev.hasFrames === !track.muted ? prev : { ...prev, hasFrames: !track.muted }));
+            track.onunmute = update;
+            track.onmute = update;
+            track.onended = () => setState((prev) => ({ ...prev, hasFrames: false }));
+            update();
+          }
           setState((prev) => {
             // If we already have a remote stream, add the new track to it
             if (prev.remoteStream) {

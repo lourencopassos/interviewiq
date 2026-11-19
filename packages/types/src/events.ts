@@ -44,6 +44,8 @@ export type InterviewEvent =
         streamId: string;
         sdpOffer: { type: string; sdp?: string };
         iceServers: { urls: string | string[]; username?: string; credential?: string }[];
+        /** Still image of the presenter, shown while no frames are flowing. */
+        presenterUrl?: string;
       };
     }
   | { type: "avatar_stream_audio"; data: { questionId: string } }

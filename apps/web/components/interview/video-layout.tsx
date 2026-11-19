@@ -8,6 +8,8 @@ interface VideoLayoutProps {
   // Avatar
   remoteStream: MediaStream | null;
   isStreamConnected: boolean;
+  hasFrames?: boolean;
+  presenterUrl?: string | null;
   isPlaying: boolean;
   avatarPhase: "speaking" | "listening" | "thinking" | "fallback" | "loading";
   isMockMode: boolean;
@@ -15,6 +17,8 @@ interface VideoLayoutProps {
   webcamStream: MediaStream | null;
   webcamActive: boolean;
   onWebcamToggle: () => void;
+  /** Full-width header strip rendered above the split. */
+  header?: ReactNode;
   // Content
   children: ReactNode;
 }
@@ -23,23 +27,29 @@ interface VideoLayoutProps {
 export function VideoLayout({
   remoteStream,
   isStreamConnected,
+  hasFrames,
+  presenterUrl,
   isPlaying,
   avatarPhase,
   isMockMode,
   webcamStream,
   webcamActive,
   onWebcamToggle,
+  header,
   children,
 }: VideoLayoutProps) {
   return (
-    <div className="container max-w-6xl py-6 sm:py-8">
+    <div className="container max-w-6xl space-y-5 py-6 sm:py-8">
+      {header}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:items-start">
         {/* Left: Avatar panel (3/5 width on desktop) */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 lg:sticky lg:top-24">
           <div className="relative">
             <AvatarPanel
               remoteStream={remoteStream}
               isStreamConnected={isStreamConnected}
+              hasFrames={hasFrames}
+              presenterUrl={presenterUrl}
               isPlaying={isPlaying}
               phase={avatarPhase}
               isMockMode={isMockMode}

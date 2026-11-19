@@ -28,6 +28,7 @@ interface InterviewState {
     streamId: string;
     sdpOffer: RTCSessionDescriptionInit;
     iceServers: RTCIceServer[];
+    presenterUrl?: string;
   } | null;
   avatarSpeaking: boolean;
   avatarFailed: boolean;
@@ -79,6 +80,7 @@ type InterviewAction =
         streamId: string;
         sdpOffer: RTCSessionDescriptionInit;
         iceServers: RTCIceServer[];
+        presenterUrl?: string;
       };
     }
   | { type: "avatar_stream_audio"; payload: { questionId: string } }
@@ -122,6 +124,7 @@ function interviewReducer(
       return {
         ...state,
         currentQuestion: action.payload,
+        error: state.error?.code === "START_FAILED" ? null : state.error,
         transcript: null,
         evaluation: null,
         transitionMessage: null,
@@ -130,7 +133,9 @@ function interviewReducer(
       };
 
     case "audio_ready":
-      return { ...state, audioUrl: action.payload.audioUrl };
+      return state.currentQuestion?.questionId === action.payload.questionId
+        ? { ...state, audioUrl: action.payload.audioUrl }
+        : state;
 
     case "transcription_complete":
       return { ...state, transcript: action.payload.transcript };
@@ -164,10 +169,12 @@ function interviewReducer(
     case "avatar_stream_ready":
       return {
         ...state,
+        avatarFailed: false,
         avatarStreamData: {
           streamId: action.payload.streamId,
           sdpOffer: action.payload.sdpOffer,
           iceServers: action.payload.iceServers,
+          presenterUrl: action.payload.presenterUrl,
         },
       };
 
